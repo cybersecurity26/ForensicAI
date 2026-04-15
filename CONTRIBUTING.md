@@ -1,70 +1,57 @@
-# Contributing to ForensicAI
+# Contribution Guidelines
 
-Thank you for considering contributing to ForensicAI! We welcome contributions from the community. To ensure a smooth collaboration process, please follow these guidelines.
+Welcome to the ForensicAI project! We appreciate your interest in contributing. Please follow the guidelines below to enhance our collaborative efforts.
 
-## Development Setup
+## Getting Started
 
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/cybersecurity26/ForensicAI.git
-   cd ForensicAI
-   ```
+1. **Client Setup**:
+   - Clone the repository using `git clone <repository-url>`.
+   - Navigate to the client directory: `cd client`.
+   - Install dependencies: `npm install`.
+   - Start the client: `npm start`.
 
-2. **Set Up the Environment**
-   Make sure you have Python 3.x installed. You can set up a virtual environment using:
-   ```bash
-   python -m venv env
-   source env/bin/activate  # On Windows use `env\Scripts\activate`
-   ```
+2. **Server Setup**:
+   - Navigate to the server directory: `cd server`.
+   - Ensure MongoDB is running on your local machine or connect to a remote instance.
+   - Install dependencies: `npm install`.
+   - Create a `.env` file for your environment variables, including:
+     - `MONGODB_URI` for MongoDB connection
+     - `AI_API_KEY` for any AI service keys used in the application
+   - Start the server: `npm start`.
 
-3. **Install Dependencies**
-   Install the required dependencies using pip:
-   ```bash
-   pip install -r requirements.txt
-   ```
+## Development Workflow
 
-4. **Run Tests**
-   Before submitting your contribution, ensure that all tests pass:
-   ```bash
-   pytest
-   ```
+- Follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for commit messages.
+- Use feature branches for new developments and keep the `main` branch stable.
+- Regularly merge changes from `main` into your feature branch to resolve conflicts early.
 
-## Coding Standards
+## Code Standards
 
-- Follow PEP 8 guidelines for Python coding.
-- Use meaningful variable and function names.
-- Write comments and documentation for complex logic.
-- Ensure consistent formatting and style throughout the codebase.
+- Follow ES6+ JavaScript/JSX conventions.
+- Use CSS variables for consistent theming and styling.
+- Design APIs with REST principles; favor meaningful naming and appropriate HTTP status codes.
+- Utilize React hooks effectively for state and lifecycle management.
+
+## Testing Procedures
+
+1. **Authentication**: Ensure that user authentication mechanisms are robust and tested.
+2. **Case Management**: Test all functionalities that relate to case creation, updates, and retrieval.
+3. **Evidence**: Validate the handling and management of evidence submissions.
+4. **Reports**: Test different scenarios for generating and viewing reports.
+5. **Timeline**: Check the chronological display of events and evidence.
+
+## Security & Legal
+
+- Maintain a clear **chain of custody** for evidence.
+- Ensure **evidence integrity** is preserved throughout the lifecycle of case management.
+- Follow legal guidelines for **AI labeling** and data handling.
+- Adhere to established **forensics standards** at all levels.
 
 ## Pull Request Process
 
-1. **Create a Feature Branch**
-   It is recommended to create a new branch for each feature or bug fix.
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
+- Submit pull requests against the `main` branch.
+- Include a clear description of changes and reference any related issues.
+- Request reviews from at least two maintainers before merging.
+- Ensure that all tests are passing before submitting your PR.
 
-2. **Make Changes and Commit**
-   After making your changes, commit them with a descriptive message:
-   ```bash
-   git commit -m "Add some feature"
-   ```
-
-3. **Push Your Changes**
-   Push the changes to your branch:
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-4. **Open a Pull Request**
-   Go to the GitHub repository and open a pull request. Provide a clear description of the changes you’ve made and why they are necessary.
-
-## Forensic Reporting Best Practices
-
-- Ensure clarity and precision in your forensic reports.
-- Include all relevant data, methodologies, and tools used in the investigation.
-- Maintain an objective tone and avoid speculation.
-- Utilize visual aids, such as charts and graphs, to enhance understanding.
-- Follow legal and ethical guidelines throughout the reporting process.
-
-Thank you for contributing to ForensicAI!
+Happy Coding!
