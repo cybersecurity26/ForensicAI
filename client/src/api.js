@@ -3,7 +3,7 @@
  * Uses Vite proxy (/api → http://localhost:5000/api).
  */
 
-const BASE = '/api'
+const BASE = import.meta.env.VITE_API_URL || '/api'
 
 function getToken() {
   return localStorage.getItem('forensic_token') || ''
