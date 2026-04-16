@@ -1,57 +1,246 @@
-# Contribution Guidelines
+# Contributing to ForensicAI
 
-Welcome to the ForensicAI project! We appreciate your interest in contributing. Please follow the guidelines below to enhance our collaborative efforts.
+Thank you for considering contributing to **ForensicAI**! This document outlines the guidelines for contributing to the project. By participating, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
 
-## Getting Started
+---
 
-1. **Client Setup**:
-   - Clone the repository using `git clone <repository-url>`.
-   - Navigate to the client directory: `cd client`.
-   - Install dependencies: `npm install`.
-   - Start the client: `npm start`.
+## 📋 Table of Contents
 
-2. **Server Setup**:
-   - Navigate to the server directory: `cd server`.
-   - Ensure MongoDB is running on your local machine or connect to a remote instance.
-   - Install dependencies: `npm install`.
-   - Create a `.env` file for your environment variables, including:
-     - `MONGODB_URI` for MongoDB connection
-     - `AI_API_KEY` for any AI service keys used in the application
-   - Start the server: `npm start`.
+- [Getting Started](#getting-started)
+- [Development Setup](#development-setup)
+- [How to Contribute](#how-to-contribute)
+- [Pull Request Process](#pull-request-process)
+- [Code Style](#code-style)
+- [Commit Convention](#commit-convention)
+- [Reporting Bugs](#reporting-bugs)
+- [Feature Requests](#feature-requests)
+- [Security Issues](#security-issues)
 
-## Development Workflow
+---
 
-- Follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for commit messages.
-- Use feature branches for new developments and keep the `main` branch stable.
-- Regularly merge changes from `main` into your feature branch to resolve conflicts early.
+## 🚀 Getting Started
 
-## Code Standards
+1. **Fork** the repository on GitHub
+2. **Clone** your fork locally:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/ForensicAI.git
+   cd ForensicAI
+   ```
+3. **Add upstream** remote:
+   ```bash
+   git remote add upstream https://github.com/cybersecurity26/ForensicAI.git
+   ```
+4. **Create a branch** for your changes:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
 
-- Follow ES6+ JavaScript/JSX conventions.
-- Use CSS variables for consistent theming and styling.
-- Design APIs with REST principles; favor meaningful naming and appropriate HTTP status codes.
-- Utilize React hooks effectively for state and lifecycle management.
+---
 
-## Testing Procedures
+## 🛠 Development Setup
 
-1. **Authentication**: Ensure that user authentication mechanisms are robust and tested.
-2. **Case Management**: Test all functionalities that relate to case creation, updates, and retrieval.
-3. **Evidence**: Validate the handling and management of evidence submissions.
-4. **Reports**: Test different scenarios for generating and viewing reports.
-5. **Timeline**: Check the chronological display of events and evidence.
+### Prerequisites
+- Node.js v18+
+- MongoDB v6+ (local or [MongoDB Atlas](https://www.mongodb.com/atlas))
+- An AI API key (OpenAI, Gemini, or Mistral)
 
-## Security & Legal
+### Server Setup
+```bash
+cd server
+npm install
+cp .env.example .env
+# Edit .env with your configuration
+npm run dev
+```
 
-- Maintain a clear **chain of custody** for evidence.
-- Ensure **evidence integrity** is preserved throughout the lifecycle of case management.
-- Follow legal guidelines for **AI labeling** and data handling.
-- Adhere to established **forensics standards** at all levels.
+### Client Setup
+```bash
+cd client
+npm install
+npm run dev
+```
 
-## Pull Request Process
+The client runs at `http://localhost:5173` and proxies API requests to the server on port `5000`.
 
-- Submit pull requests against the `main` branch.
-- Include a clear description of changes and reference any related issues.
-- Request reviews from at least two maintainers before merging.
-- Ensure that all tests are passing before submitting your PR.
+---
 
-Happy Coding!
+## 🤝 How to Contribute
+
+### Types of Contributions Welcome
+
+| Type | Description |
+|---|---|
+| 🐛 **Bug Fixes** | Fix existing issues or reported bugs |
+| ✨ **Features** | Add new functionality to the platform |
+| 📝 **Documentation** | Improve README, inline comments, JSDoc |
+| 🎨 **UI/UX** | Improve design, accessibility, animations |
+| ⚡ **Performance** | Optimize queries, reduce bundle size, caching |
+| 🧪 **Testing** | Add unit tests, integration tests, E2E tests |
+| 🔒 **Security** | Fix vulnerabilities, improve auth, add validations |
+
+### Areas Open for Contribution
+
+- **Evidence Parsers** — Add support for new file formats (PCAP deep parsing, EVTX, registry hives)
+- **AI Providers** — Integrate additional AI providers (Anthropic Claude, Cohere, local LLMs)
+- **Export Formats** — Add DOCX, CSV, or STIX/TAXII export for reports
+- **Internationalization** — Add multi-language support
+- **Accessibility** — Improve ARIA labels, keyboard navigation, screen reader support
+- **Mobile UI** — Responsive improvements for tablet/mobile devices
+
+---
+
+## 📬 Pull Request Process
+
+1. **Sync with upstream** before starting work:
+   ```bash
+   git fetch upstream
+   git rebase upstream/main
+   ```
+
+2. **Make your changes** in a dedicated branch:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+3. **Test your changes** locally:
+   - Verify the server starts without errors
+   - Verify the client builds successfully (`npm run build`)
+   - Test your changes in both dark and light themes
+   - Check that existing features still work
+
+4. **Commit your changes** using the [commit convention](#commit-convention)
+
+5. **Push** to your fork:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+6. **Open a Pull Request** against `cybersecurity26/ForensicAI:main`
+   - Use a clear, descriptive title
+   - Reference any related issues (e.g., `Fixes #12`)
+   - Describe what you changed and why
+   - Include screenshots for UI changes
+
+### PR Review Criteria
+
+- [ ] Code follows the project's [code style](#code-style)
+- [ ] No console errors or warnings
+- [ ] Works in both dark and light themes
+- [ ] Does not break existing functionality
+- [ ] Commit messages follow the convention
+- [ ] Documentation updated if needed
+
+---
+
+## 🎨 Code Style
+
+### JavaScript / JSX
+- **ES Modules** — Use `import`/`export` (not `require`)
+- **Functional Components** — React hooks only, no class components
+- **Async/Await** — For all asynchronous operations (no raw `.then()` chains)
+- **Destructuring** — Prefer destructured imports, props, and state
+- **No `var`** — Use `const` by default, `let` only when reassignment is needed
+- **Semicolons** — Optional (project currently omits them)
+
+### Naming Conventions
+| Type | Convention | Example |
+|---|---|---|
+| Components | PascalCase | `CaseDetail.jsx` |
+| Functions | camelCase | `handleSearchSelect` |
+| Variables | camelCase | `searchResults` |
+| CSS Variables | --kebab-case | `--accent-primary` |
+| Constants | camelCase or UPPER_SNAKE_CASE | `pageTitles`, `MAX_FILE_SIZE` |
+| Files (pages) | PascalCase | `EvidenceUpload.jsx` |
+| Files (utils) | camelCase | `parser.js` |
+
+### CSS
+- Use **CSS custom properties** (`var(--name)`) for theming
+- Dark-first design; light theme via `[data-theme="light"]` selectors
+- No CSS frameworks — vanilla CSS with the design system in `index.css`
+
+### API Routes
+- RESTful: `GET`, `POST`, `PUT`, `DELETE`
+- All routes under `/api/` prefix
+- JSON request/response bodies
+- Use `requireAuth` middleware for protected routes
+
+---
+
+## 📝 Commit Convention
+
+Use **Conventional Commits** format:
+
+```
+type: short description
+```
+
+### Types
+
+| Type | When to Use |
+|---|---|
+| `feat` | New feature or functionality |
+| `fix` | Bug fix |
+| `docs` | Documentation only changes |
+| `style` | CSS, formatting (no logic change) |
+| `refactor` | Code restructuring (no feature/fix) |
+| `perf` | Performance improvement |
+| `test` | Adding or updating tests |
+| `chore` | Build scripts, dependencies, config |
+| `security` | Security-related changes |
+
+### Examples
+```bash
+git commit -m "feat: add PCAP deep packet parser"
+git commit -m "fix: resolve tooltip visibility in light theme"
+git commit -m "docs: update API endpoint documentation"
+git commit -m "style: improve mobile sidebar responsiveness"
+git commit -m "security: add input sanitization for case descriptions"
+```
+
+---
+
+## 🐛 Reporting Bugs
+
+Open a [GitHub Issue](https://github.com/cybersecurity26/ForensicAI/issues/new) with:
+
+1. **Title** — Clear, descriptive summary
+2. **Environment** — Browser, OS, Node.js version
+3. **Steps to Reproduce** — Numbered list
+4. **Expected Behavior** — What should happen
+5. **Actual Behavior** — What actually happened
+6. **Screenshots** — If applicable (especially for UI bugs)
+7. **Console Errors** — Any errors from browser DevTools / server logs
+
+---
+
+## 💡 Feature Requests
+
+Open a [GitHub Issue](https://github.com/cybersecurity26/ForensicAI/issues/new) with:
+
+1. **Title** — Prefix with `[Feature Request]`
+2. **Problem** — What problem does this solve?
+3. **Proposed Solution** — How should it work?
+4. **Alternatives** — Any alternatives you considered
+5. **Context** — Why is this important for digital forensics workflows?
+
+---
+
+## 🔒 Security Issues
+
+**Do NOT open public issues for security vulnerabilities.**
+
+See our [Security Policy](SECURITY.md) for instructions on responsible disclosure.
+
+---
+
+## 📄 License
+
+By contributing to ForensicAI, you agree that your contributions will be licensed under the same license as the project.
+
+---
+
+<div align="center">
+
+**Thank you for helping make ForensicAI better! 🔬**
+
+</div>
