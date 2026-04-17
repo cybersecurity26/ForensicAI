@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Search, Bell, Moon, Sun, HelpCircle, X, ExternalLink, LogOut, User, Shield, Building2 } from 'lucide-react'
+import { Search, Bell, Moon, Sun, HelpCircle, X, ExternalLink, LogOut, User, Shield, Building2, Menu } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getNotifications, globalSearch } from '../api'
 
@@ -34,7 +34,7 @@ const helpTopics = [
   { q: 'How do I change my password?', a: 'Go to Settings → Security tab. Enter your current password and your new password, then click Update Password.' },
 ]
 
-export default function Header() {
+export default function Header({ onMenuToggle }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
@@ -228,6 +228,9 @@ export default function Header() {
     <>
       <header className="header">
         <div className="header-left">
+          <button className="header-hamburger" onClick={onMenuToggle} aria-label="Toggle menu">
+            <Menu size={22} />
+          </button>
           <h2 className="header-title">{getTitle()}</h2>
         </div>
 
