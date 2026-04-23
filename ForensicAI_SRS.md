@@ -9,7 +9,7 @@
 **Version 1.0 — Approved**
 
 Prepared by:
-- V. Vinay
+- [Your Name]
 - RTRP-2026-G1023
 
 ---
@@ -63,7 +63,7 @@ Prepared by:
 
 | Name | Date | Reason For Changes | Version |
 |------|------|--------------------|---------|
-| V. Vinay | 03-04-2026 | Initial SRS creation | 1.0 |
+| G1023 | 03-04-2026 | Initial SRS creation | 1.0 |
 | | | | |
 | | | | |
 

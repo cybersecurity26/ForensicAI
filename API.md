@@ -14,8 +14,8 @@ Create a new user account.
 **Body:**
 ```json
 {
-  "name": "Tirukoti Vinay",
-  "email": "vinay@example.com",
+  "name": "Jhon henry",
+  "email": "henry@example.com",
   "password": "SecurePass123",
   "role": "investigator"
 }
@@ -25,7 +25,7 @@ Create a new user account.
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiIs...",
-  "user": { "id": "...", "name": "Tirukoti Vinay", "email": "vinay@example.com", "role": "investigator" }
+  "user": { "id": "...", "name": "Jhon henry", "email": "henry@example.com", "role": "investigator" }
 }
 ```
 
@@ -37,7 +37,7 @@ Authenticate and receive a JWT token.
 **Body:**
 ```json
 {
-  "email": "vinay@example.com",
+  "email": "henry@example.com",
   "password": "SecurePass123"
 }
 ```
@@ -46,7 +46,7 @@ Authenticate and receive a JWT token.
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiIs...",
-  "user": { "id": "...", "name": "Tirukoti Vinay", "email": "vinay@example.com", "role": "investigator" },
+  "user": { "id": "...", "name": "Jhon henry", "email": "henry@example.com", "role": "investigator" },
   "requires2FA": false
 }
 ```
@@ -73,7 +73,7 @@ Generate 2FA secret and QR code. 🔒 **Requires Auth**
 ```json
 {
   "secret": "JBSWY3DPEHPK3PXP",
-  "qrCodeUrl": "otpauth://totp/ForensicAI:vinay@example.com?..."
+  "qrCodeUrl": "otpauth://totp/ForensicAI:henry@example.com?..."
 }
 ```
 
@@ -109,7 +109,7 @@ List all cases. 🔒 **Requires Auth**
       "description": "...",
       "status": "active",
       "priority": "high",
-      "createdBy": { "name": "Tirukoti Vinay" },
+      "createdBy": { "name": "Jhon henry" },
       "evidenceCount": 3,
       "createdAt": "2026-04-10T..."
     }
@@ -371,8 +371,8 @@ Update user profile. 🔒 **Requires Auth**
 **Body:**
 ```json
 {
-  "name": "Tirukoti Vinay",
-  "email": "vinay@example.com",
+  "name": "Jhon henry",
+  "email": "henry@example.com",
   "organization": "CyberSec Lab"
 }
 ```
