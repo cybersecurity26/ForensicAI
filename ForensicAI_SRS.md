@@ -9,7 +9,6 @@
 **Version 1.0 — Approved**
 
 Prepared by:
-- [Your Name]
 - RTRP-2026-G1023
 
 ---
