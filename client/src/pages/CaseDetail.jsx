@@ -25,35 +25,118 @@ export function renderMarkdown(text) {
 
   const escapeHtml = (str) => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-  // Replace code blocks
-  cleanText = cleanText.replace(/```([\s\S]+?)```/g, (match, p1) => {
-    return `<pre class="code-block"><code>${escapeHtml(p1.trim())}</code></pre>`
+  // 1. Escape HTML of the text first for security.
+  let processedText = escapeHtml(cleanText)
+
+  // 2. Extract code blocks
+  const codeBlocks = []
+  processedText = processedText.replace(/```([\s\S]*?)```/g, (match, p1) => {
+    const idx = codeBlocks.length
+    codeBlocks.push(p1.trim())
+    return `\n\n===CODEBLOCK_${idx}===\n\n`
   })
 
-  // Headers
-  cleanText = cleanText.replace(/^### (.*?)$/gm, '<h3 class="chat-h3">$1</h3>')
-  cleanText = cleanText.replace(/^## (.*?)$/gm, '<h2 class="chat-h2">$1</h2>')
-  cleanText = cleanText.replace(/^# (.*?)$/gm, '<h1 class="chat-h1">$1</h1>')
+  // 3. Extract inline code blocks
+  const inlineCodes = []
+  processedText = processedText.replace(/`([^`]+)`/g, (match, p1) => {
+    const idx = inlineCodes.length
+    inlineCodes.push(p1)
+    return `===INLINECODE_${idx}===`
+  })
 
-  // Bullet lists
-  cleanText = cleanText.replace(/^\s*-\s+(.*?)$/gm, '<li>$1</li>')
-  cleanText = cleanText.replace(/((?:<li>.*?<\/li>\s*)+)/g, '<ul>$1</ul>')
+  // 4. Block-level parsing
+  const lines = processedText.split(/\r?\n/)
+  const output = []
+  let inUl = false
+  let inOl = false
+  let paragraphLines = []
 
+  const flushParagraph = () => {
+    if (paragraphLines.length > 0) {
+      output.push(`<p class="chat-p">${paragraphLines.join(' ')}</p>`)
+      paragraphLines = []
+    }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const trimmed = line.trim()
+
+    const headerMatch = line.match(/^([#]{1,6})\s+(.*)$/)
+    const ulMatch = line.match(/^\s*[-*+]\s+(.*)$/)
+    const olMatch = line.match(/^\s*(\d+)\.\s+(.*)$/)
+
+    if (headerMatch || ulMatch || olMatch || trimmed === '') {
+      flushParagraph()
+    }
+
+    if (inUl && !ulMatch) {
+      output.push('</ul>')
+      inUl = false
+    }
+    if (inOl && !olMatch) {
+      output.push('</ol>')
+      inOl = false
+    }
+
+    if (headerMatch) {
+      const level = headerMatch[1].length
+      const content = headerMatch[2]
+      output.push(`<h${level} class="chat-h${level}">${content}</h${level}>`)
+    } else if (ulMatch) {
+      if (!inUl) {
+        output.push('<ul class="chat-ul">')
+        inUl = true
+      }
+      output.push(`<li class="chat-li">${ulMatch[1]}</li>`)
+    } else if (olMatch) {
+      if (!inOl) {
+        output.push('<ol class="chat-ol">')
+        inOl = true
+      }
+      output.push(`<li class="chat-li">${olMatch[2]}</li>`)
+    } else if (trimmed === '') {
+      if (output.length > 0 && output[output.length - 1] !== '<div class="chat-paragraph-spacer"></div>') {
+        output.push('<div class="chat-paragraph-spacer"></div>')
+      }
+    } else {
+      paragraphLines.push(trimmed)
+    }
+  }
+  flushParagraph()
+
+  if (inUl) output.push('</ul>')
+  if (inOl) output.push('</ol>')
+
+  let html = output.join('\n')
+
+  // 5. Parse inline tags
   // Bold
-  cleanText = cleanText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/__(.*?)__/g, '<strong>$1</strong>')
 
-  // Inline code
-  cleanText = cleanText.replace(/`(.*?)`/g, '<code class="inline-code">$1</code>')
+  // Italic
+  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>')
+  html = html.replace(/_(.*?)_/g, '<em>$1</em>')
 
-  // Highlights
-  cleanText = cleanText.replace(/\b((?:[0-9]{1,3}\.){3}[0-9]{1,3})\b/g, '<span class="chat-ip-highlight">$1</span>')
-  cleanText = cleanText.replace(/\b(T[0-9]{4}(?:\.[0-9]{4}|(?:\.[0-9]{3}))?)\b/g, '<span class="chat-mitre-highlight">$1</span>')
-  cleanText = cleanText.replace(/\b(critical|danger|warning|suspicious|malicious)\b/gi, (match) => {
+  // Custom highlights
+  html = html.replace(/\b((?:[0-9]{1,3}\.){3}[0-9]{1,3})\b/g, '<span class="chat-ip-highlight">$1</span>')
+  html = html.replace(/\b(T[0-9]{4}(?:\.[0-9]{4}|(?:\.[0-9]{3}))?)\b/g, '<span class="chat-mitre-highlight">$1</span>')
+  html = html.replace(/\b(critical|danger|warning|suspicious|malicious)\b/gi, (match) => {
     const cls = match.toLowerCase() === 'warning' || match.toLowerCase() === 'suspicious' ? 'chat-sev-warning' : 'chat-sev-critical'
     return `<span class="${cls}">${match}</span>`
   })
 
-  return <div className="chat-markdown-body" dangerouslySetInnerHTML={{ __html: cleanText }} />
+  // 6. Restore code blocks & inline code
+  inlineCodes.forEach((code, idx) => {
+    html = html.replace(`===INLINECODE_${idx}===`, () => `<code class="inline-code">${code}</code>`)
+  })
+
+  codeBlocks.forEach((code, idx) => {
+    html = html.replace(`===CODEBLOCK_${idx}===`, () => `<pre class="code-block"><code>${code}</code></pre>`)
+  })
+
+  return <div className="chat-markdown-body" dangerouslySetInnerHTML={{ __html: html }} />
 }
 
 export default function CaseDetail() {
@@ -78,13 +161,34 @@ export default function CaseDetail() {
   const [chatLoading, setChatLoading] = useState(false)
   const [selectedSources, setSelectedSources] = useState(null)
 
+  // Load chat history if case ID changes
+  useEffect(() => {
+    if (!id) {
+      setChatMessages([])
+      return
+    }
+    const saved = localStorage.getItem(`forensicai_chat_history_${id}`)
+    if (saved) {
+      try {
+        setChatMessages(JSON.parse(saved))
+      } catch (e) {
+        console.error('Failed to parse saved chat history:', e)
+        setChatMessages([])
+      }
+    } else {
+      setChatMessages([])
+    }
+  }, [id])
+
   const handleSendChatMessage = async (e, directMessage = '') => {
     if (e) e.preventDefault()
     const msg = directMessage || chatInput
     if (!msg.trim() || chatLoading) return
 
     const userMsg = { role: 'user', content: msg }
-    setChatMessages(prev => [...prev, userMsg])
+    const updatedMessagesWithUser = [...chatMessages, userMsg]
+    setChatMessages(updatedMessagesWithUser)
+    localStorage.setItem(`forensicai_chat_history_${id}`, JSON.stringify(updatedMessagesWithUser))
     if (!directMessage) setChatInput('')
     setChatLoading(true)
 
@@ -92,18 +196,30 @@ export default function CaseDetail() {
       const history = chatMessages.map(m => ({ role: m.role, content: m.content }))
       const res = await sendCaseChatMessage(id, msg, history)
       
-      setChatMessages(prev => [...prev, {
+      const assistantMsg = {
         role: 'assistant',
         content: res.message,
         sources: res.sources
-      }])
+      }
+      const updatedMessagesWithAssistant = [...updatedMessagesWithUser, assistantMsg]
+      setChatMessages(updatedMessagesWithAssistant)
+      localStorage.setItem(`forensicai_chat_history_${id}`, JSON.stringify(updatedMessagesWithAssistant))
     } catch (err) {
-      setChatMessages(prev => [...prev, {
+      const errorMsg = {
         role: 'assistant',
         content: `⚠️ Failed to query Case Chatbot: ${err.message}`
-      }])
+      }
+      const updatedMessagesWithError = [...updatedMessagesWithUser, errorMsg]
+      setChatMessages(updatedMessagesWithError)
+      localStorage.setItem(`forensicai_chat_history_${id}`, JSON.stringify(updatedMessagesWithError))
     }
     chatLoadingChange(false)
+  }
+
+  const handleClearHistory = () => {
+    if (!id) return
+    localStorage.removeItem(`forensicai_chat_history_${id}`)
+    setChatMessages([])
   }
 
   // To prevent lint warning/error, define helper variable or just invoke it directly.
@@ -624,8 +740,17 @@ export default function CaseDetail() {
       {/* Forensic Chat Tab */}
       {activeTab === 'chat' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <div className="section-header">
+          <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="section-title">Forensic Chat Copilot (RAG)</div>
+            {chatMessages.length > 0 && (
+              <button
+                onClick={handleClearHistory}
+                className="btn btn-secondary btn-sm"
+                style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <Trash2 size={14} /> Clear History
+              </button>
+            )}
           </div>
           
           <div className="chat-container">

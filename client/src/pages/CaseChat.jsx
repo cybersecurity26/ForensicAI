@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { MessageSquare, Send, Loader, Brain, Globe, Database, X } from 'lucide-react'
+import { MessageSquare, Send, Loader, Brain, Globe, Database, X, Trash2 } from 'lucide-react'
 import { getCases, sendCaseChatMessage } from '../api'
 import { renderMarkdown } from './CaseDetail'
 
@@ -20,9 +20,23 @@ export default function CaseChat() {
     }).catch(() => {})
   }, [])
 
-  // Clear chat if case changes
+  // Load chat history if case changes
   useEffect(() => {
-    setChatMessages([])
+    if (!selectedCaseId) {
+      setChatMessages([])
+      return
+    }
+    const saved = localStorage.getItem(`forensicai_chat_history_${selectedCaseId}`)
+    if (saved) {
+      try {
+        setChatMessages(JSON.parse(saved))
+      } catch (e) {
+        console.error('Failed to parse saved chat history:', e)
+        setChatMessages([])
+      }
+    } else {
+      setChatMessages([])
+    }
   }, [selectedCaseId])
 
   const handleSendChatMessage = async (e, directMessage = '') => {
@@ -31,7 +45,9 @@ export default function CaseChat() {
     if (!msg.trim() || chatLoading || !selectedCaseId) return
 
     const userMsg = { role: 'user', content: msg }
-    setChatMessages(prev => [...prev, userMsg])
+    const updatedMessagesWithUser = [...chatMessages, userMsg]
+    setChatMessages(updatedMessagesWithUser)
+    localStorage.setItem(`forensicai_chat_history_${selectedCaseId}`, JSON.stringify(updatedMessagesWithUser))
     if (!directMessage) setChatInput('')
     setChatLoading(true)
 
@@ -39,18 +55,30 @@ export default function CaseChat() {
       const history = chatMessages.map(m => ({ role: m.role, content: m.content }))
       const res = await sendCaseChatMessage(selectedCaseId, msg, history)
       
-      setChatMessages(prev => [...prev, {
+      const assistantMsg = {
         role: 'assistant',
         content: res.message,
         sources: res.sources
-      }])
+      }
+      const updatedMessagesWithAssistant = [...updatedMessagesWithUser, assistantMsg]
+      setChatMessages(updatedMessagesWithAssistant)
+      localStorage.setItem(`forensicai_chat_history_${selectedCaseId}`, JSON.stringify(updatedMessagesWithAssistant))
     } catch (err) {
-      setChatMessages(prev => [...prev, {
+      const errorMsg = {
         role: 'assistant',
         content: `⚠️ Failed to query Case Chatbot: ${err.message}`
-      }])
+      }
+      const updatedMessagesWithError = [...updatedMessagesWithUser, errorMsg]
+      setChatMessages(updatedMessagesWithError)
+      localStorage.setItem(`forensicai_chat_history_${selectedCaseId}`, JSON.stringify(updatedMessagesWithError))
     }
     setChatLoading(false)
+  }
+
+  const handleClearHistory = () => {
+    if (!selectedCaseId) return
+    localStorage.removeItem(`forensicai_chat_history_${selectedCaseId}`)
+    setChatMessages([])
   }
 
   return (
@@ -62,8 +90,8 @@ export default function CaseChat() {
         </p>
       </div>
 
-      {/* Case Selector */}
-      <div style={{ marginBottom: 24 }}>
+      {/* Case Selector & Clear History */}
+      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <select
           value={selectedCaseId}
           onChange={(e) => setSelectedCaseId(e.target.value)}
@@ -72,6 +100,7 @@ export default function CaseChat() {
             background: 'var(--bg-input)', border: '1px solid var(--border-primary)',
             color: 'var(--text-primary)', fontSize: '0.85rem', fontFamily: 'var(--font-primary)',
             minWidth: 300,
+            outline: 'none',
           }}
         >
           <option value="">— Select a case —</option>
@@ -79,6 +108,16 @@ export default function CaseChat() {
             <option key={c._id} value={c._id}>{c.caseNumber} — {c.title}</option>
           ))}
         </select>
+
+        {selectedCaseId && chatMessages.length > 0 && (
+          <button
+            onClick={handleClearHistory}
+            className="btn btn-secondary btn-sm"
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <Trash2 size={14} /> Clear History
+          </button>
+        )}
       </div>
 
       {/* RAG Chat Console */}
