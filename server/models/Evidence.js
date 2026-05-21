@@ -30,6 +30,16 @@ const evidenceSchema = new mongoose.Schema({
       detail: { type: String },
       severity: { type: String, enum: ['info', 'warning', 'danger', 'critical'] },
       raw: { type: String },
+      threatIntel: {
+        score: { type: Number, default: 0 },
+        isMalicious: { type: Boolean, default: false },
+        details: { type: String, default: '' }
+      },
+      mitreAttack: {
+        techniqueId: { type: String, default: '' },
+        techniqueName: { type: String, default: '' },
+        tactic: { type: String, default: '' }
+      }
     }],
     summary: { type: String },
     anomalies: [{ type: String }],

@@ -45,6 +45,7 @@ export const getDashboardStats = () => request('/dashboard/stats')
 export const getDashboardActivity = () => request('/dashboard/activity')
 export const getNotifications = () => request('/dashboard/notifications')
 export const globalSearch = (q) => request(`/dashboard/search?q=${encodeURIComponent(q)}`)
+export const getThreatIocs = () => request('/dashboard/iocs')
 
 // ─── Cases ───
 export const getCases = (params = {}) => {
@@ -148,3 +149,13 @@ export const authenticatePasskey = (loginToken, credential) => request('/auth/pa
   method: 'POST',
   body: JSON.stringify({ loginToken, credential }),
 })
+
+// ─── Case Chat Chatbot (RAG) ───
+export const sendCaseChatMessage = (caseId, message, history) => request(`/cases/${caseId}/chat`, {
+  method: 'POST',
+  body: JSON.stringify({ message, history }),
+})
+
+// ─── System Health ───
+export const getHealthStatus = () => request('/health')
+

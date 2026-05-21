@@ -71,9 +71,13 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'operational',
     service: 'ForensicAI Server',
-    version: '1.0.0',
+    version: '1.0.2',
     timestamp: new Date().toISOString(),
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    threatIntel: {
+      abuseIpDbConfigured: !!(process.env.ABUSEIPDB_API_KEY && process.env.ABUSEIPDB_API_KEY !== 'your_api_key_here'),
+      virusTotalConfigured: !!(process.env.VIRUSTOTAL_API_KEY && process.env.VIRUSTOTAL_API_KEY !== 'your_api_key_here'),
+    }
   })
 })
 

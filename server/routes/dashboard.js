@@ -106,6 +106,67 @@ router.get('/activity', optionalAuth, async (req, res, next) => {
   }
 })
 
+// GET /api/dashboard/iocs — get all threat intelligence indicators (IOCs) across all cases
+router.get('/iocs', optionalAuth, async (req, res, next) => {
+  try {
+    const evidenceList = await Evidence.find()
+      .populate('caseId', 'title caseNumber')
+      .lean()
+
+    const iocs = []
+    const seen = new Set()
+
+    for (const ev of evidenceList) {
+      if (ev.parsedData?.events) {
+        for (const e of ev.parsedData.events) {
+          if (e.threatIntel && e.threatIntel.score > 0) {
+            let value = 'Unknown IOC'
+            let type = 'Malicious Hash'
+            
+            // Extract IP
+            const ipMatch = e.detail?.match(/\b((?:[0-9]{1,3}\.){3}[0-9]{1,3})\b/)
+            if (ipMatch) {
+              value = ipMatch[1]
+              type = 'IP Reputation'
+            } else {
+              // Extract MD5/SHA256 Hash
+              const hashMatch = e.detail?.match(/\b([a-fA-F0-9]{32})\b|\b([a-fA-F0-9]{64})\b/)
+              if (hashMatch) {
+                value = hashMatch[1] || hashMatch[2]
+                type = 'Malware Hash'
+              }
+            }
+
+            const key = `${type}-${value}-${ev.caseId?._id || 'none'}`
+            if (!seen.has(key)) {
+              seen.add(key)
+              iocs.push({
+                value,
+                type,
+                score: e.threatIntel.score,
+                details: e.threatIntel.details,
+                caseId: ev.caseId?._id,
+                caseNumber: ev.caseId?.caseNumber || 'N/A',
+                caseTitle: ev.caseId?.title || 'Unknown Case',
+                evidenceId: ev._id,
+                evidenceName: ev.originalName,
+                timestamp: e.timestamp
+              })
+            }
+          }
+        }
+      }
+    }
+
+    // Sort by risk score descending, then by timestamp descending
+    iocs.sort((a, b) => b.score - a.score || new Date(b.timestamp) - new Date(a.timestamp))
+
+    res.json({ iocs })
+  } catch (err) {
+    next(err)
+  }
+})
+
 // GET /api/dashboard/notifications — notifications for bell icon
 router.get('/notifications', optionalAuth, async (req, res, next) => {
   try {

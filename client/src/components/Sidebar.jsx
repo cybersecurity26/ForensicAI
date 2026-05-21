@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, FolderOpen, Upload, Clock, FileText,
-  Settings, Shield, Activity, Database, Brain, LogOut, X
+  Settings, Shield, Activity, Database, Brain, LogOut, X, MessageSquare, Globe
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -11,6 +11,9 @@ const navItems = [
     { to: '/cases', icon: FolderOpen, label: 'Case Management', badge: null },
     { to: '/evidence', icon: Upload, label: 'Evidence Upload', badge: null },
     { to: '/timeline', icon: Clock, label: 'Timeline', badge: null },
+    { to: '/mitre', icon: Activity, label: 'MITRE ATT&CK Matrix', badge: null },
+    { to: '/iocs', icon: Globe, label: 'Threat Indicators (IOCs)', badge: null },
+    { to: '/chat', icon: MessageSquare, label: 'Case RAG Chat', badge: null },
   ]},
   { section: 'Reporting', items: [
     { to: '/reports', icon: FileText, label: 'Reports', badge: null },

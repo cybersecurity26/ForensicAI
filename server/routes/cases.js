@@ -1,6 +1,8 @@
 import express from 'express'
 import { body, validationResult, param } from 'express-validator'
 import Case from '../models/Case.js'
+import Evidence from '../models/Evidence.js'
+import { generateChatResponse } from '../services/aiService.js'
 import { optionalAuth } from '../middleware/auth.js'
 import { logAudit } from '../middleware/audit.js'
 
@@ -138,6 +140,102 @@ router.delete('/:id', optionalAuth, async (req, res, next) => {
     await logAudit('case_updated', 'case', updated._id, `Case ${updated.caseNumber} archived`, req)
 
     res.json({ message: 'Case archived', case: updated })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /api/cases/:id/chat — Ask questions about case evidence (RAG Chat)
+router.post('/:id/chat', optionalAuth, async (req, res, next) => {
+  try {
+    const { message, history = [] } = req.body
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' })
+    }
+
+    const caseDoc = await Case.findById(req.params.id)
+    if (!caseDoc) {
+      return res.status(404).json({ error: 'Case not found' })
+    }
+
+    // 1. Gather all parsed events for this case
+    const evidenceList = await Evidence.find({ caseId: caseDoc._id })
+    const allEvents = []
+    for (const ev of evidenceList) {
+      if (ev.parsedData && ev.parsedData.events) {
+        for (const event of ev.parsedData.events) {
+          allEvents.push({
+            ...event.toObject(),
+            evidenceName: ev.originalName
+          })
+        }
+      }
+    }
+
+    // 2. Perform a local search/keyword matching to rank events based on user prompt
+    const keywords = message.toLowerCase()
+      .replace(/[^a-z0-9\s.]/g, '') // Keep dots for IPs
+      .split(/\s+/)
+      .filter(word => word.length > 2)
+
+    let matchedEvents = []
+
+    if (keywords.length === 0) {
+      // Return top 25 chronologically or severity sorted events if no query keywords
+      matchedEvents = allEvents
+        .sort((a, b) => (b.severity === 'critical' || b.severity === 'danger' ? 1 : -1))
+        .slice(0, 25)
+    } else {
+      // Score each event based on keyword matches
+      const scored = allEvents.map(event => {
+        let score = 0
+        const detailLower = (event.detail || '').toLowerCase()
+        const rawLower = (event.raw || '').toLowerCase()
+        const sourceLower = (event.source || '').toLowerCase()
+        
+        for (const kw of keywords) {
+          if (detailLower.includes(kw)) score += 5
+          if (rawLower.includes(kw)) score += 3
+          if (sourceLower.includes(kw)) score += 2
+          if (event.mitreAttack?.techniqueId?.toLowerCase().includes(kw)) score += 10
+          if (event.mitreAttack?.techniqueName?.toLowerCase().includes(kw)) score += 8
+          if (event.threatIntel?.details?.toLowerCase().includes(kw)) score += 8
+        }
+        
+        // Boost matches based on severity
+        if (score > 0) {
+          if (event.severity === 'critical') score += 5
+          if (event.severity === 'danger') score += 3
+          if (event.severity === 'warning') score += 1
+        }
+        
+        return { event, score }
+      })
+
+      matchedEvents = scored
+        .filter(item => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map(item => item.event)
+        .slice(0, 25)
+    }
+
+    // 3. Call AI Service to generate response
+    const answer = await generateChatResponse(caseDoc.title, history, matchedEvents, message)
+
+    await logAudit('case_chat_queried', 'case', caseDoc._id, `Query: "${message.substring(0, 40)}..."`, req)
+
+    res.json({
+      message: answer,
+      sources: matchedEvents.map(e => ({
+        timestamp: e.timestamp,
+        source: e.source,
+        detail: e.detail,
+        severity: e.severity,
+        mitreAttack: e.mitreAttack,
+        threatIntel: e.threatIntel,
+        evidenceName: e.evidenceName
+      }))
+    })
   } catch (err) {
     next(err)
   }

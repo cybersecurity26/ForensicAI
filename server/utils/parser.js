@@ -1,5 +1,7 @@
 import fs from 'fs'
 import path from 'path'
+import { getIpReputation, getHashReputation } from '../services/threatIntelService.js'
+import { mapLogToAttack } from './attackMapper.js'
 
 /**
  * Parse a log/evidence file and extract timestamped events.
@@ -10,21 +12,73 @@ export async function parseLogFile(filePath) {
   const ext = path.extname(filePath).toLowerCase()
   const content = fs.readFileSync(filePath, 'utf-8')
 
+  let parsed;
   if (ext === '.json') {
-    return parseJsonLog(content)
+    parsed = parseJsonLog(content)
+  } else if (ext === '.csv' || isCsvContent(content)) {
+    parsed = parseCsvLog(content)
+  } else if (isKeyValueLog(content)) {
+    parsed = parseKeyValueLog(content)
+  } else {
+    parsed = parseTextLog(content)
   }
 
-  // Auto-detect CSV by checking if first non-empty line contains commas and looks like a header
-  if (ext === '.csv' || isCsvContent(content)) {
-    return parseCsvLog(content)
+  // Enrich events with Threat Intel & MITRE mapping
+  if (parsed && parsed.events) {
+    const cache = { ip: {}, hash: {} }
+    
+    for (let i = 0; i < parsed.events.length; i++) {
+      const event = parsed.events[i]
+      
+      // 1. MITRE ATT&CK Mapping
+      const attack = mapLogToAttack(event.detail || event.raw)
+      if (attack) {
+        event.mitreAttack = attack
+      }
+
+      // 2. Threat Intel IOC Extraction (IPs)
+      const ipMatches = (event.detail || event.raw || '').match(/\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g)
+      if (ipMatches) {
+        for (const ip of ipMatches) {
+          if (cache.ip[ip] === undefined) {
+            if (Object.keys(cache.ip).length < 50) {
+              cache.ip[ip] = await getIpReputation(ip)
+            } else {
+              cache.ip[ip] = { score: 0, isMalicious: false, details: '' }
+            }
+          }
+          const rep = cache.ip[ip]
+          if (rep && rep.score > 0) {
+            if (!event.threatIntel || rep.score > event.threatIntel.score) {
+              event.threatIntel = rep
+            }
+          }
+        }
+      }
+
+      // 3. Threat Intel IOC Extraction (Hashes)
+      const hashMatches = (event.detail || event.raw || '').match(/\b[a-fA-F0-9]{32}\b|\b[a-fA-F0-9]{64}\b/g)
+      if (hashMatches) {
+        for (const hash of hashMatches) {
+          if (cache.hash[hash] === undefined) {
+            if (Object.keys(cache.hash).length < 50) {
+              cache.hash[hash] = await getHashReputation(hash)
+            } else {
+              cache.hash[hash] = { score: 0, isMalicious: false, details: '' }
+            }
+          }
+          const rep = cache.hash[hash]
+          if (rep && rep.score > 0) {
+            if (!event.threatIntel || rep.score > event.threatIntel.score) {
+              event.threatIntel = rep
+            }
+          }
+        }
+      }
+    }
   }
 
-  // Auto-detect key-value block format (like Application Event Log)
-  if (isKeyValueLog(content)) {
-    return parseKeyValueLog(content)
-  }
-
-  return parseTextLog(content)
+  return parsed
 }
 
 /** Detect CSV content regardless of file extension */

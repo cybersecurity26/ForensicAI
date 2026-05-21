@@ -222,12 +222,43 @@ function estimateConfidence(choice) {
   return 75
 }
 
+/**
+ * Generate an AI response for Case RAG Chat
+ */
+export async function generateChatResponse(caseTitle, history, matchedEvents, userMessage) {
+  const formattedEvents = matchedEvents.map(e => 
+    `[${e.timestamp || 'No Timestamp'}] [Src: ${e.source}] [Severity: ${e.severity || 'info'}]${e.mitreAttack?.techniqueId ? ` [MITRE: ${e.mitreAttack.techniqueId} - ${e.mitreAttack.techniqueName}]` : ''}${e.threatIntel?.score > 0 ? ` [ThreatIntel: Score ${e.threatIntel.score}% - ${e.threatIntel.details}]` : ''} - Detail: ${e.detail}`
+  ).join('\n')
+
+  const prompt = `You are ForensicAI Chatbot, an expert digital forensics investigator assistant.
+You are helping an analyst investigate a case.
+
+Case Name: ${caseTitle}
+
+Here is the relevant evidence event context extracted from the log files matching the search query:
+${formattedEvents || 'No matching log events found in the case logs.'}
+
+Chat History:
+${history.map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`).join('\n')}
+
+User Question: ${userMessage}
+
+Instructions:
+1. Provide a highly precise, technical, and objective response to the User's question using ONLY the provided evidence event context.
+2. If the context does not contain the answer, state that you cannot find it in the current evidence, but suggest what type of logs or events might help.
+3. Be concise and format your response in professional Markdown. Highlight IP addresses, usernames, files, hashes, and MITRE techniques in bold or code formatting.`
+
+  const response = await callLLM(prompt, 'chat')
+  return response.text
+}
+
 function getMockResponse(taskType) {
   const mocks = {
     summary: `Based on the available evidence artifacts, this investigation documents events occurring within the specified timeframe. Analysis of system logs and authentication records indicates access patterns that warrant further examination. All findings presented are based on available evidence and require human verification before being treated as conclusive.`,
     findings: `1. Authentication logs indicate multiple access attempts from external IP addresses during the reviewed period.\n2. Network traffic analysis reveals data transfer activity that correlates with the timeline of detected events.\n3. System configuration files show standard deployment patterns with areas identified for security hardening.\n4. No evidence of persistent unauthorized access mechanisms was identified in the initial analysis.\n5. Log integrity was maintained throughout the evidence collection process as verified by SHA-256 hashing.`,
     recommendations: `1. Review and update authentication policies for service accounts.\n2. Implement network segmentation to limit lateral movement potential.\n3. Enhance monitoring and alerting for privileged account activity.\n4. Conduct regular access audits for legacy and service accounts.\n5. Update incident response procedures based on response timeline analysis.`,
     section: `This section presents observations derived from the analyzed evidence artifacts. All statements are based on verifiable data and should be independently verified by the reviewing investigator before inclusion in the final report.`,
+    chat: `Based on the forensic logs for this case, I have identified the following indicators:\n\n1. **Brute Force attempts** (**T1110**) were detected from IP **45.227.254.20** targeting the SSH service. The threat intelligence feed flags this IP with a **95% malicious confidence score**.\n2. **Valid Account login** (**T1078**) was subsequently recorded for user **admin** at 09:12:03.\n3. Multiple **sudo executions** (**T1548.001**) were performed shortly after, indicating privilege escalation.\n\nLet me know if you would like me to correlate specific timestamps or inspect other IP addresses.`
   }
 
   return {

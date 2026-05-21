@@ -89,6 +89,8 @@ router.post('/upload', optionalAuth, upload.array('files', 10), async (req, res,
                 detail: e.detail || '',
                 severity: e.severity || 'info',
                 raw: e.raw || '',
+                threatIntel: e.threatIntel || { score: 0, isMalicious: false, details: '' },
+                mitreAttack: e.mitreAttack || { techniqueId: '', techniqueName: '', tactic: '' }
               })),
               summary: parsed.summary,
               anomalies: parsed.events
@@ -156,11 +158,13 @@ router.post('/:id/parse', optionalAuth, async (req, res, next) => {
       evidence.parsedData = {
         events: parsedResult.events.map(e => ({
           timestamp: e.timestamp || '',
-          eventType: e.eventType,
+          eventType: e.eventType || 'log_entry',
           source: e.source,
           detail: e.detail,
           severity: e.severity,
           raw: e.raw,
+          threatIntel: e.threatIntel || { score: 0, isMalicious: false, details: '' },
+          mitreAttack: e.mitreAttack || { techniqueId: '', techniqueName: '', tactic: '' }
         })),
         summary: parsedResult.summary,
         anomalies: parsedResult.events
@@ -266,6 +270,8 @@ router.post('/parse-all/:caseId', optionalAuth, async (req, res, next) => {
             detail: e.detail || '',
             severity: e.severity || 'info',
             raw: e.raw || '',
+            threatIntel: e.threatIntel || { score: 0, isMalicious: false, details: '' },
+            mitreAttack: e.mitreAttack || { techniqueId: '', techniqueName: '', tactic: '' }
           })),
           summary: parsedResult.summary,
           anomalies: parsedResult.events

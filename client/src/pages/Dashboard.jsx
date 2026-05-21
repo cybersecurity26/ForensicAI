@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import {
   FolderOpen, FileText, Shield, AlertTriangle, TrendingUp,
   TrendingDown, Clock, Upload, CheckCircle, ArrowRight,
-  Activity, Database, Cpu, Eye, Loader
+  Activity, Database, Cpu, Eye, Loader, Bot, MessageSquare
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -110,11 +110,16 @@ export default function Dashboard() {
 
   return (
     <motion.div className="page-enter" variants={container} initial="hidden" animate="show">
-      <motion.div className="page-header" variants={item}>
-        <h1 className="page-title">Investigation Dashboard</h1>
-        <p className="page-description">
-          Overview of your digital forensics investigations, evidence integrity, and AI-assisted reporting status.
-        </p>
+      <motion.div className="page-header" variants={item} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 className="page-title">Investigation Dashboard</h1>
+          <p className="page-description">
+            Overview of your digital forensics investigations, evidence integrity, and AI-assisted reporting status.
+          </p>
+        </div>
+        <Link to="/chat" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Bot size={16} /> AI Chat Assistant
+        </Link>
       </motion.div>
 
       {/* Stats Grid */}
@@ -284,6 +289,40 @@ export default function Dashboard() {
           </div>
         </div>
       </motion.div>
+
+      {/* Floating AI Assistant Button */}
+      <Link
+        to="/chat"
+        style={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          width: 50,
+          height: 50,
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+          boxShadow: '0 4px 20px rgba(0, 212, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#fff',
+          zIndex: 99,
+          cursor: 'pointer',
+          border: 'none',
+          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.transform = 'scale(1.08)'
+          e.currentTarget.style.boxShadow = '0 6px 24px rgba(0, 212, 255, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3)'
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.transform = 'scale(1)'
+          e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 212, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+        }}
+        title="Query Case AI Copilot"
+      >
+        <Bot size={24} />
+      </Link>
     </motion.div>
   )
 }

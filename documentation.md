@@ -35,11 +35,14 @@ Digital forensic investigations produce massive volumes of log files, network ca
 |---|---|
 | **Evidence Management** | Upload, hash (SHA-256), parse, and verify digital evidence files |
 | **Automated Parsing** | Extract timestamped events, anomalies, and metadata from log files |
-| **AI-Powered Report Generation** | Use Mistral AI to auto-generate forensic report sections |
+| **AI-Powered Report Generation** | Use configured LLMs to auto-generate forensic report sections |
 | **Timeline Reconstruction** | Automatically build chronological event timelines from parsed evidence |
 | **Case Management** | Track investigations with statuses, priorities, tags, and assignments |
 | **Evidence Integrity** | SHA-256 hashing with re-verification and full audit trail |
 | **Authentication & 2FA** | Secure login with JWT + WebAuthn passkey-based two-factor authentication |
+| **Threat Intelligence** | Corroborate IPs and file hashes with AbuseIPDB and VirusTotal threat feeds |
+| **MITRE ATT&CK Mapping** | Correlate log events directly with adversary Tactics and Techniques |
+| **Case Chat RAG Copilot** | Natural language case assistant leveraging context-ranked logs and LLMs |
 
 ### 1.3 Domain
 
@@ -90,12 +93,14 @@ Digital forensic investigations produce massive volumes of log files, network ca
 | **Morgan** | 1.10 | HTTP request logging |
 | **dotenv** | 16.4 | Environment variable management |
 
-### 2.3 AI Engine
+### 2.3 AI & Threat Intelligence Engines
 
 | Technology | Purpose |
 |---|---|
-| **Mistral AI API** | LLM for generating forensic report sections, summaries, and findings |
-| **Custom Prompt Engineering** | Domain-specific prompts for forensic analysis context |
+| **Mistral / OpenAI / Gemini** | Configurable LLMs for report generation and Case Chat RAG |
+| **AbuseIPDB API** | Live checks of IP addresses to determine risk and abuse confidence scores |
+| **VirusTotal API** | Sandbox analysis checking file hashes against multiple antivirus engines |
+| **Local Threat Intel Cache** | Static known signatures for offline and demo threat simulation |
 
 ### 2.4 Why This Stack?
 
@@ -103,11 +108,12 @@ Digital forensic investigations produce massive volumes of log files, network ca
 |---|---|---|
 | **React + Vite** | Fast HMR, component reusability, large ecosystem | Next.js (unnecessary SSR for this tool) |
 | **Express** | Lightweight, flexible, mature middleware ecosystem | Fastify (less community support) |
-| **MongoDB** | Flexible schema for forensic data (events, metadata) | PostgreSQL (rigid schema less suitable for variable evidence structures) |
+| **MongoDB** | Flexible schema for forensic data (events, metadata, enriched threat feeds) | PostgreSQL (rigid schema less suitable for variable structures) |
 | **JWT Auth** | Stateless, scalable, no session store needed | Session cookies (requires server-side state) |
 | **bcryptjs** | Industry-standard password hashing, pure JavaScript | Argon2 (requires native bindings) |
 | **WebAuthn Passkeys** | Hardware-backed 2FA, phishing-resistant | TOTP (less secure, user must manage codes) |
-| **Mistral AI** | Cost-effective, strong instruction-following | OpenAI GPT-4 (higher cost), Ollama (requires local GPU) |
+| **Mistral / OpenAI / Gemini** | Multi-LLM provider support tailored to client cost/performance needs | Local Ollama (requires local high-end GPU) |
+| **AbuseIPDB & VirusTotal** | Industry-standard threat feeds providing real-time indicator reputations | Manual reputation searches (greatly slows down investigators) |
 
 ---
 
@@ -122,12 +128,16 @@ Digital forensic investigations produce massive volumes of log files, network ca
 │  ┌───────────────────────────────────────────────────────────────┐  │
 │  │  Pages                                                        │  │
 │  │  ┌──────────┐ ┌───────┐ ┌────────────┐ ┌──────────────────┐  │  │
-│  │  │ Login    │ │ Dash- │ │ Cases /    │ │ Evidence Upload │  │  │
-│  │  │ (Auth)   │ │ board │ │ CaseDetail │ │ (Drag & Drop)  │  │  │
+│  │  │ Login    │ │ Dash- │ │ Cases /    │ │ Evidence Upload  │  │  │
+│  │  │ (Auth)   │ │ board │ │ CaseDetail │ │ (Drag & Drop)    │  │  │
 │  │  └──────────┘ └───────┘ └────────────┘ └──────────────────┘  │  │
 │  │  ┌──────────┐ ┌─────────────────────┐ ┌──────────────────┐  │  │
 │  │  │ Timeline │ │ Reports / Detail    │ │ Settings         │  │  │
 │  │  │          │ │ (Edit + Export PDF) │ │ (Profile/2FA/AI) │  │  │
+│  │  └──────────┘ └─────────────────────┘ └──────────────────┘  │  │
+│  │  ┌──────────┐ ┌─────────────────────┐ ┌──────────────────┐  │  │
+│  │  │ Threat   │ │ MITRE ATT&CK Matrix │ │ Case Chat Copilot│  │  │
+│  │  │ IOCs     │ │ (Adversary Tactics) │ │ (RAG Chatbot)    │  │  │
 │  │  └──────────┘ └─────────────────────┘ └──────────────────┘  │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 │  ┌──────────────┐  ┌─────────────────┐  ┌─────────────────────┐   │
@@ -173,9 +183,13 @@ Digital forensic investigations produce massive volumes of log files, network ca
 ┌─────────────────────────────────────────────────────────────────────┐
 │                     EXTERNAL SERVICES                               │
 │  ┌──────────────────────────┐  ┌────────────────────────────────┐  │
-│  │  Mistral AI API          │  │  File System (uploads/)        │  │
-│  │  (Report Generation)     │  │  (Evidence Storage)            │  │
+│  │  LLM Provider APIs        │  │  Threat Intel APIs             │  │
+│  │  (Mistral/OpenAI/Gemini)  │  │  (AbuseIPDB & VirusTotal)      │  │
 │  └──────────────────────────┘  └────────────────────────────────┘  │
+│  ┌──────────────────────────┐                                      │
+│  │  File System (uploads/)  │                                      │
+│  │  (Evidence Storage)      │                                      │
+│  └──────────────────────────┘                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -225,9 +239,13 @@ Evidence File (.log)        User Login
 │ settings{}     │       │ assignee (FK)     │       │ status           │
 │ passkeys[]     │       │ evidence[] (FK)   │       │ metadata{}       │
 │ createdAt      │       │ reports[] (FK)    │       │ parsedData{}     │
-└────────────────┘       │ tags[]            │       │  └─ events[]     │
-                         │ notes             │       │  └─ summary      │
-                         └───────────────────┘       │  └─ anomalies[]  │
+└────────────────┘       │ tags[]            │       │  ├─ events[]     │
+                         │ notes             │       │  │  ├─ timestamp │
+                         └───────────────────┘       │  │  ├─ detail    │
+                                │                    │  │  ├─ mitreAttack
+                                │                    │  │  └─ threatIntel
+                                │                    │  ├─ summary      │
+                                │                    │  └─ anomalies[]  │
                                 │                    │ uploadedBy (FK)  │
                                 │                    └──────────────────┘
                                 │ 1:N
@@ -266,13 +284,16 @@ App.jsx
 │       ├── Sidebar.jsx ────── Navigation + Logout
 │       ├── Header.jsx ─────── Search + Profile dropdown
 │       │
-│       ├── Dashboard.jsx ──── Stats + Charts (Recharts)
+│       ├── Dashboard.jsx ──── Stats + Charts (Recharts) + AI Assistant Button
 │       ├── Cases.jsx ──────── Case list + CRUD
 │       │   └── CaseDetail.jsx ── Evidence, timeline, notes
 │       ├── EvidenceUpload.jsx ── Drag-drop + file parsing
 │       ├── Timeline.jsx ────── Chronological event view
 │       ├── Reports.jsx ─────── Report list + generation
 │       │   └── ReportDetail.jsx ── Edit sections + PDF export
+│       ├── ThreatIocs.jsx ──── Global Threat Indicators (IOCs)
+│       ├── MitreAttack.jsx ─── MITRE ATT&CK Matrix Mapping
+│       ├── CaseChat.jsx ────── Case Chat Copilot (RAG)
 │       └── Settings.jsx ────── Profile / Security / AI / Notifications
 │           └── 2FA Passkey management (WebAuthn)
 ```
@@ -323,10 +344,44 @@ const patterns = [
 
 ```javascript
 // server/services/aiService.js
-// Uses Mistral AI API with forensic-specific prompts:
+// Uses configured LLM API (Mistral/OpenAI/Gemini) with forensic-specific prompts:
 // - "You are a digital forensics expert..."
 // - Context includes: parsed events, timeline data, anomalies
 // - Output: structured report sections (Executive Summary, Findings, etc.)
+```
+
+#### MITRE ATT&CK Mapping Rule Engine
+
+```javascript
+// server/utils/attackMapper.js
+// Maps log pattern regexes to standard MITRE ATT&CK techniques:
+// - T1110 (Brute Force) on "failed password/logon failure"
+// - T1078 (Valid Accounts) on "accepted password/successful logon"
+// - T1548.001 (Sudo/Su Abuse) on "sudo/su/elevated privilege"
+// - T1033/T1046 (System/Network Discovery) on tools (whoami, nmap, netstat)
+// - T1105 (Ingress Tool Transfer) on tools (wget, curl)
+// - T1041 (Exfiltration) on exfiltration commands
+```
+
+#### Threat Intelligence reputation lookup
+
+```javascript
+// server/services/threatIntelService.js
+// Checks threat reputation for extracted public IPs and file hashes:
+// - AbuseIPDB: Query ipAddress to check abuse Confidence Score
+// - VirusTotal: Query file sha256/md5 to check malicious engine votes
+// - Fallback: Simulated reputation based on IP metrics if API keys not set
+```
+
+#### Case Chat RAG Log Retrieval
+
+```javascript
+// server/routes/cases.js (POST /cases/:id/chat)
+// 1. Gather all parsed events for the case
+// 2. Perform a local search using tokenized keyword matching
+// 3. Score matching events based on keyword locations and severity
+// 4. Retrieve top 25 highest-scoring logs as context
+// 5. Send prompt, chat history, and context logs to LLM for response
 ```
 
 ### 4.2 Data Structures
@@ -392,7 +447,13 @@ MONGODB_URI=mongodb://localhost:27017/forensicai
 JWT_SECRET=your-secure-random-secret-key-here
 
 # AI Engine
-MISTRAL_API_KEY=your-mistral-api-key
+AI_PROVIDER=openai # openai, gemini, or mistral
+AI_API_KEY=your-ai-provider-api-key
+AI_MODEL=gpt-4o # or gemini-1.5-pro, mistral-large
+
+# Threat Intelligence
+ABUSEIPDB_API_KEY=your_abuseipdb_api_key
+VIRUSTOTAL_API_KEY=your_virustotal_api_key
 
 # Server
 PORT=5000
@@ -521,12 +582,15 @@ POST /api/auth/login
 | `POST /api/auth/login` | Validates credentials, checks 2FA, issues JWT |
 | `POST /api/evidence/upload` | Multer → SHA-256 → Parse → Store |
 | `GET /api/timeline/:caseId` | Aggregates all evidence events chronologically |
-| `POST /api/ai/summarize` | Sends evidence data to Mistral AI for summary |
+| `POST /api/ai/summarize` | Sends evidence data to AI for summary |
 | `POST /api/reports/:id/generate` | AI generates all report sections |
 | `PUT /api/reports/:id/sections/:idx` | Edit specific report section (with history) |
 | `GET /api/reports/:id/export/pdf` | PDFKit renders formatted forensic PDF |
 | `GET /api/evidence/:id/verify` | Re-computes SHA-256 and compares to stored hash |
 | `PUT /api/settings/security` | Updates 2FA settings and session timeout |
+| `GET /api/dashboard/iocs` | Aggregates and returns threat intelligence indicators across cases |
+| `POST /api/cases/:id/chat` | RAG chatbot querying case-specific logs with context retrieval |
+| `GET /api/health` | Health status and dynamic key configuration detection |
 
 ---
 
@@ -612,6 +676,32 @@ POST /api/auth/login
 | **Metadata Captured** | User ID, IP address, user agent, timestamp |
 | **21 Action Types** | From `case_created` to `user_login_2fa` to `report_exported` |
 
+### 7.9 Threat Indicators (IOCs) Dashboard
+
+| Feature | Description |
+|---|---|
+| **Consolidated Board** | Centralized table of all identified IPs and file hashes across cases |
+| **Severity Badges** | Critical (score 90+), High (70-89), Medium (40-69), Low (<40) tags |
+| **Integrity Health Check** | Status indicators reflecting live external API keys vs. local simulators |
+| **Search & Filtering** | Instant client-side filters for text search, threat type, and severity |
+| **Citations and Links** | One-click copy for IOCs and direct linkages to originating cases |
+
+### 7.10 MITRE ATT&CK Matrix
+
+| Feature | Description |
+|---|---|
+| **Case Correlation** | Direct mapping of a case's log entries to standardized cyber threat tactics |
+| **Interactive Grid** | Columns for Execution, Privilege Escalation, Discovery, Lateral Movement, etc. |
+| **Highlight Active Techniques** | Cards glow and show total match counts when techniques are detected |
+
+### 7.11 Case Chat Assistant (RAG)
+
+| Feature | Description |
+|---|---|
+| **Natural Language Queries** | Speak directly with case data (e.g. "Any brute force attacks?") |
+| **Retrieval Augmented** | Locally searches and scores the most relevant 25 events to feed context to LLM |
+| **Citations Feed** | Lists all source logs used to generate answers, with detailed popup views |
+
 ---
 
 ## Project Structure
@@ -634,14 +724,17 @@ Forensics Summarizer/
 │   │   │   ├── Timeline.jsx         # Event timeline view
 │   │   │   ├── Reports.jsx          # Report list + generation
 │   │   │   ├── ReportDetail.jsx     # Edit sections + PDF export
-│   │   │   └── Settings.jsx         # Profile/Security/AI/Notifications
+│   │   │   ├── Settings.jsx         # Profile/Security/AI/Notifications
+│   │   │   ├── ThreatIocs.jsx       # Aggregated IOCs dashboard
+│   │   │   ├── MitreAttack.jsx      # MITRE ATT&CK visual matrix
+│   │   │   └── CaseChat.jsx         # Case RAG Chat chatbot
 │   │   ├── api.js                   # Axios HTTP client + auth headers
 │   │   ├── App.jsx                  # Router + AuthProvider + route protection
 │   │   └── index.css                # Complete design system (CSS variables)
 │   ├── package.json
 │   └── vite.config.js
 │
-├── server/                          # Express Backend
+│── server/                          # Express Backend
 │   ├── middleware/
 │   │   ├── auth.js                  # JWT verification middleware
 │   │   └── audit.js                 # Audit logging middleware
@@ -662,10 +755,12 @@ Forensics Summarizer/
 │   │   ├── dashboard.js             # Dashboard stats + activity
 │   │   └── audit.js                 # Audit log retrieval
 │   ├── services/
-│   │   └── aiService.js             # Mistral AI API integration
+│   │   ├── aiService.js             # AI provider abstraction layer
+│   │   └── threatIntelService.js    # Threat Intelligence Integration (AbuseIPDB/VT)
 │   ├── utils/
 │   │   ├── hash.js                  # SHA-256 file hashing
-│   │   └── parser.js                # Multi-format log parser
+│   │   ├── parser.js                # Multi-format log parser
+│   │   └── attackMapper.js          # MITRE ATT&CK pattern mapper
 │   ├── server.js                    # Express app entry point
 │   ├── package.json
 │   └── .env                         # Environment variables
@@ -675,4 +770,5 @@ Forensics Summarizer/
 
 ---
 
-*ForensicAI v1.0.0 — Built with React, Express, MongoDB, and Mistral AI*
+*ForensicAI v1.0.2 — Built with React, Express, MongoDB, and Mistral AI*
+

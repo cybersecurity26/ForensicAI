@@ -28,9 +28,13 @@ The platform upholds the **Human-in-the-Loop** principle: AI assists with analys
 - **Evidence Upload & Parsing** — Drag-and-drop upload supporting LOG, CSV, JSON, TXT, XML, PCAP, EVTX formats with automatic format detection
 - **SHA-256 Integrity Hashing** — Every uploaded file is immediately hashed for chain-of-custody verification
 - **Timeline Reconstruction** — Unified, filterable event timelines across multiple evidence sources with severity classification and date grouping
+- **Threat Indicators (IOCs) Dashboard** — Global aggregated board displaying all parsed IP reputation and malware hash threats across cases with filters, origin case linkage, and copy helpers
 
-### AI-Powered Analysis
+### AI & Threat Intelligence Integration
 - **Automated Report Generation** — AI generates draft forensic reports with executive summaries, key findings, timelines, and recommendations
+- **Case Chat RAG Copilot** — Interactive assistant to ask natural language questions about logs within a specific case, retrieving top-scored relevant logs as prompt context
+- **MITRE ATT&CK Rule Mapper** — Automatically correlates parsed log events to standard attacker Tactics & Techniques, showing them in an interactive visual matrix
+- **Multi-API Reputation Feeds** — Dynamic queries to AbuseIPDB (for IP risk) and VirusTotal (for malware hashes) with credential health monitoring status badges
 - **Multi-Provider Support** — Choose between OpenAI (GPT-4), Google Gemini, or Mistral AI for report generation
 - **Editable Sections** — Each report section has an inline markdown toolbar for editing with Bold, Italic, Underline, Lists
 - **Human Review Required** — AI-generated content is clearly labeled and requires human validation
@@ -128,6 +132,10 @@ AI_TEMPERATURE=0.3
 AI_MAX_TOKENS=2048
 UPLOAD_DIR=./uploads
 MAX_FILE_SIZE=5368709120
+
+# Threat Intelligence (Optional - for live reputations)
+ABUSEIPDB_API_KEY=your_abuseipdb_api_key_here
+VIRUSTOTAL_API_KEY=your_virustotal_api_key_here
 ```
 
 Start the server:
@@ -180,6 +188,9 @@ ForensicAI/
 │   │   │   ├── Reports.jsx
 │   │   │   ├── ReportDetail.jsx
 │   │   │   ├── Settings.jsx
+│   │   │   ├── ThreatIocs.jsx     # Aggregated IOCs dashboard
+│   │   │   ├── MitreAttack.jsx    # MITRE ATT&CK visual matrix
+│   │   │   ├── CaseChat.jsx       # Case RAG Chat chatbot
 │   │   │   ├── Legal.jsx
 │   │   │   └── Login.jsx
 │   │   ├── api.js              # Centralized API calls
@@ -201,19 +212,21 @@ ForensicAI/
 │   │   └── AuditLog.js
 │   ├── routes/                 # API route handlers
 │   │   ├── auth.js             # Login, register, 2FA, passkeys
-│   │   ├── cases.js            # Case CRUD operations
+│   │   ├── cases.js            # Case CRUD operations + RAG Chat
 │   │   ├── evidence.js         # File upload, parsing
 │   │   ├── reports.js          # Report generation, editing
 │   │   ├── timeline.js         # Timeline reconstruction
-│   │   ├── dashboard.js        # Stats, activity, search, notifications
+│   │   ├── dashboard.js        # Stats, activity, IOCs aggregator
 │   │   ├── settings.js         # Profile, security, AI config
 │   │   ├── audit.js            # Audit log retrieval
 │   │   └── ai.js               # AI provider management
 │   ├── services/
-│   │   └── aiService.js        # AI provider abstraction layer
+│   │   ├── aiService.js        # AI provider abstraction layer
+│   │   └── threatIntelService.js # Threat Intelligence Integration (AbuseIPDB/VT)
 │   ├── utils/
 │   │   ├── parser.js           # Evidence file parser + timeline builder
-│   │   └── hash.js             # SHA-256 file hashing
+│   │   ├── hash.js             # SHA-256 file hashing
+│   │   └── attackMapper.js      # MITRE ATT&CK pattern mapper
 │   ├── uploads/                # Uploaded evidence files (gitignored)
 │   ├── server.js               # Express app entry point
 │   ├── .env.example            # Environment variable template

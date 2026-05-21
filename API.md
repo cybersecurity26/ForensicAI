@@ -160,6 +160,48 @@ Delete a case. 🔒 **Requires Auth (Admin)**
 
 ---
 
+### POST `/cases/:id/chat`
+Ask questions about case evidence (RAG Chatbot). 🔒 **Requires Auth**
+
+**Body:**
+```json
+{
+  "message": "Did you detect any brute force logins?",
+  "history": [
+    { "role": "user", "content": "Hello" },
+    { "role": "assistant", "content": "How can I help you investigate?" }
+  ]
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Yes, I detected a brute force attack on server_alpha.log with 15 failed password attempts...",
+  "sources": [
+    {
+      "timestamp": "2026-04-10 14:23:00",
+      "source": "server_alpha.log",
+      "detail": "failed password for invalid user root from 192.168.1.105 port 22 ssh2",
+      "severity": "danger",
+      "mitreAttack": {
+        "techniqueId": "T1110",
+        "techniqueName": "Brute Force",
+        "tactic": "Credential Access"
+      },
+      "threatIntel": {
+        "score": 95,
+        "isMalicious": true,
+        "details": "AbuseIPDB: Flagged as SSH Brute-Force Scanner."
+      },
+      "evidenceName": "server_alpha.log"
+    }
+  ]
+}
+```
+
+---
+
 ## 📤 Evidence
 
 ### POST `/evidence/upload`
@@ -363,6 +405,31 @@ Global search across cases, reports, evidence. 🔒 **Optional Auth**
 
 ---
 
+### GET `/dashboard/iocs`
+Retrieve all threat intelligence indicators (IOCs) aggregated across cases. 🔒 **Requires Auth**
+
+**Response:** `200 OK`
+```json
+{
+  "iocs": [
+    {
+      "value": "45.227.254.20",
+      "type": "IP Reputation",
+      "score": 95,
+      "details": "AbuseIPDB: Flagged as SSH Brute-Force Scanner.",
+      "caseId": "643fd8f...",
+      "caseNumber": "FR-2026-0024",
+      "caseTitle": "Network Intrusion Investigation",
+      "evidenceId": "643fd9a...",
+      "evidenceName": "server_alpha.log",
+      "timestamp": "2026-04-10 14:23:00"
+    }
+  ]
+}
+```
+
+---
+
 ## ⚙️ Settings
 
 ### PUT `/settings/profile`
@@ -427,6 +494,26 @@ Check current AI provider status. 🔒 **Requires Auth**
   "provider": "openai",
   "model": "gpt-4",
   "connected": true
+}
+```
+
+---
+
+### GET `/health`
+Check application health status and threat intelligence configurations. 🔓 **Public**
+
+**Response:** `200 OK`
+```json
+{
+  "status": "operational",
+  "service": "ForensicAI Server",
+  "version": "1.0.2",
+  "timestamp": "2026-05-21T06:18:24.000Z",
+  "database": "connected",
+  "threatIntel": {
+    "abuseIpDbConfigured": true,
+    "virusTotalConfigured": true
+  }
 }
 ```
 

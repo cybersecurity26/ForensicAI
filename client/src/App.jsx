@@ -13,6 +13,9 @@ import ReportDetail from './pages/ReportDetail'
 import Settings from './pages/Settings'
 import Legal from './pages/Legal'
 import Login from './pages/Login'
+import MitreAttack from './pages/MitreAttack'
+import CaseChat from './pages/CaseChat'
+import ThreatIocs from './pages/ThreatIocs'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth()
@@ -46,6 +49,9 @@ function AppRoutes() {
             <Route path="/cases/:id" element={<ProtectedRoute><CaseDetail /></ProtectedRoute>} />
             <Route path="/evidence" element={<ProtectedRoute><EvidenceUpload /></ProtectedRoute>} />
             <Route path="/timeline" element={<ProtectedRoute><Timeline /></ProtectedRoute>} />
+            <Route path="/mitre" element={<ProtectedRoute><MitreAttack /></ProtectedRoute>} />
+            <Route path="/iocs" element={<ProtectedRoute><ThreatIocs /></ProtectedRoute>} />
+            <Route path="/chat" element={<ProtectedRoute><CaseChat /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
             <Route path="/reports/:id" element={<ProtectedRoute><ReportDetail /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

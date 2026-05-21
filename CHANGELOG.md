@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [1.0.2] — 2026-05-21
+
+### Added
+
+#### Threat Intelligence & Analysis
+- **Threat Intelligence Service**: Integrated AbuseIPDB (IP reputation scoring) and VirusTotal (malware hash scanning) APIs for dynamic threat validation.
+- **Threat Indicators (IOCs) Dashboard**: Centralized repository of all detected malicious IPs and file hashes across cases with text search, severity filters, origin case linkage, and copy-to-clipboard functionality.
+- **Dynamic Connection Monitoring**: Added active API key state validation on the server `/api/health` with real-time green/orange status badges on the dashboard.
+- **MITRE ATT&CK Mapper**: Rule-based correlation engine (`server/utils/attackMapper.js`) mapping forensic log patterns directly to standard attacker Tactics & Techniques.
+- **MITRE ATT&CK Matrix**: Fully-animated visual grid showing Execution, Privilege Escalation, Credential Access, Defense Evasion, Discovery, Command & Control, and Exfiltration.
+
+#### AI-Powered Investigation Copilot
+- **Case Chat RAG Copilot**: Interactive chatbot letting investigators ask natural language questions about logs within a specific case.
+- **Context-Ranked RAG Retrieval**: Leverages local keyword scoring and severity-based boosting to fetch the top 25 most relevant evidence logs as prompt context.
+- **Evidence Citation Cards**: Detailed references showing the originating log line, timestamp, severity, mapped MITRE technique, and threat intelligence scores with interactive popups.
+
+#### Platform Improvements
+- **Mobile Responsive Design**: Fully responsive navigation layout with collapsible sidebar overlay, hamburger menu, and responsive grids.
+- **CI/CD Integration**: Configured GitHub Actions workflows for continuous build testing, security auditing, and CodeQL static analysis.
+
+---
+
 ## [1.0.0] — 2026-04-15
 
 ### 🎉 Initial Release
@@ -65,4 +87,5 @@ The first stable release of ForensicAI — an AI-powered digital forensics inves
 
 ---
 
+[1.0.2]: https://github.com/cybersecurity26/ForensicAI/releases/tag/v1.0.2
 [1.0.0]: https://github.com/cybersecurity26/ForensicAI/releases/tag/v1.0.0

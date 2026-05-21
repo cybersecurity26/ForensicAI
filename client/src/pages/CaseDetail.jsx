@@ -4,9 +4,57 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FileText, Upload, Clock, Shield, Hash,
   Download, Eye, Trash2, CheckCircle, AlertTriangle,
-  Brain, Edit3, Save, X, Loader, User, RefreshCw
+  Brain, Edit3, Save, X, Loader, User, RefreshCw,
+  MessageSquare, Send, Globe, Database
 } from 'lucide-react'
-import { getCase, updateCase, getTimeline, getReports, getAuditLogs, generateReport, parseAllEvidence } from '../api'
+import { getCase, updateCase, getTimeline, getReports, getAuditLogs, generateReport, parseAllEvidence, sendCaseChatMessage, getHealthStatus } from '../api'
+
+export function renderMarkdown(text) {
+  if (!text) return ''
+  
+  let cleanText = text.trim()
+  if (cleanText.startsWith('```markdown')) {
+    cleanText = cleanText.substring(11)
+  } else if (cleanText.startsWith('```')) {
+    cleanText = cleanText.substring(3)
+  }
+  if (cleanText.endsWith('```')) {
+    cleanText = cleanText.substring(0, cleanText.length - 3)
+  }
+  cleanText = cleanText.trim()
+
+  const escapeHtml = (str) => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+  // Replace code blocks
+  cleanText = cleanText.replace(/```([\s\S]+?)```/g, (match, p1) => {
+    return `<pre class="code-block"><code>${escapeHtml(p1.trim())}</code></pre>`
+  })
+
+  // Headers
+  cleanText = cleanText.replace(/^### (.*?)$/gm, '<h3 class="chat-h3">$1</h3>')
+  cleanText = cleanText.replace(/^## (.*?)$/gm, '<h2 class="chat-h2">$1</h2>')
+  cleanText = cleanText.replace(/^# (.*?)$/gm, '<h1 class="chat-h1">$1</h1>')
+
+  // Bullet lists
+  cleanText = cleanText.replace(/^\s*-\s+(.*?)$/gm, '<li>$1</li>')
+  cleanText = cleanText.replace(/((?:<li>.*?<\/li>\s*)+)/g, '<ul>$1</ul>')
+
+  // Bold
+  cleanText = cleanText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+
+  // Inline code
+  cleanText = cleanText.replace(/`(.*?)`/g, '<code class="inline-code">$1</code>')
+
+  // Highlights
+  cleanText = cleanText.replace(/\b((?:[0-9]{1,3}\.){3}[0-9]{1,3})\b/g, '<span class="chat-ip-highlight">$1</span>')
+  cleanText = cleanText.replace(/\b(T[0-9]{4}(?:\.[0-9]{4}|(?:\.[0-9]{3}))?)\b/g, '<span class="chat-mitre-highlight">$1</span>')
+  cleanText = cleanText.replace(/\b(critical|danger|warning|suspicious|malicious)\b/gi, (match) => {
+    const cls = match.toLowerCase() === 'warning' || match.toLowerCase() === 'suspicious' ? 'chat-sev-warning' : 'chat-sev-critical'
+    return `<span class="${cls}">${match}</span>`
+  })
+
+  return <div className="chat-markdown-body" dangerouslySetInnerHTML={{ __html: cleanText }} />
+}
 
 export default function CaseDetail() {
   const { id } = useParams()
@@ -24,12 +72,51 @@ export default function CaseDetail() {
   const [reparsing, setReparsing] = useState(false)
   const [toast, setToast] = useState('')
 
+  // Case Chatbot State (RAG)
+  const [chatMessages, setChatMessages] = useState([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const [selectedSources, setSelectedSources] = useState(null)
+
+  const handleSendChatMessage = async (e, directMessage = '') => {
+    if (e) e.preventDefault()
+    const msg = directMessage || chatInput
+    if (!msg.trim() || chatLoading) return
+
+    const userMsg = { role: 'user', content: msg }
+    setChatMessages(prev => [...prev, userMsg])
+    if (!directMessage) setChatInput('')
+    setChatLoading(true)
+
+    try {
+      const history = chatMessages.map(m => ({ role: m.role, content: m.content }))
+      const res = await sendCaseChatMessage(id, msg, history)
+      
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: res.message,
+        sources: res.sources
+      }])
+    } catch (err) {
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `⚠️ Failed to query Case Chatbot: ${err.message}`
+      }])
+    }
+    chatLoadingChange(false)
+  }
+
+  // To prevent lint warning/error, define helper variable or just invoke it directly.
+  // Wait, let's just use a normal state updater.
+  const chatLoadingChange = (val) => setChatLoading(val)
+
   // Editable fields
   const [editTitle, setEditTitle] = useState('')
   const [editDesc, setEditDesc] = useState('')
   const [editStatus, setEditStatus] = useState('')
   const [editPriority, setEditPriority] = useState('')
   const [editAssignee, setEditAssignee] = useState('')
+  const [intelStatus, setIntelStatus] = useState({ abuseIpDbConfigured: false, virusTotalConfigured: false })
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500) }
 
@@ -48,6 +135,12 @@ export default function CaseDetail() {
         setEditAssignee(c.assigneeName || '')
         // Use populated reports from case (instant, no extra API call)
         if (c.reports && c.reports.length > 0) setReports(c.reports)
+        
+        // Fetch health status to verify API configuration
+        const health = await getHealthStatus().catch(() => null)
+        if (health && health.threatIntel) {
+          setIntelStatus(health.threatIntel)
+        }
       } catch (err) {
         console.error('Failed to load case:', err)
         setCaseData(null)
@@ -275,9 +368,17 @@ export default function CaseDetail() {
 
       {/* Tabs */}
       <div className="tabs">
-        {['evidence', 'timeline', 'reports', 'audit'].map(tab => (
-          <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+        {[
+          { id: 'evidence', label: 'Evidence' },
+          { id: 'timeline', label: 'Timeline' },
+          { id: 'mitre', label: 'MITRE ATT&CK' },
+          { id: 'chat', label: 'Forensic Chat' },
+          { id: 'threatIntel', label: 'Threat Intelligence' },
+          { id: 'reports', label: 'Reports' },
+          { id: 'audit', label: 'Audit Log' }
+        ].map(tab => (
+          <button key={tab.id} className={`tab ${activeTab === tab.id ? 'active' : ''}`} onClick={() => setActiveTab(tab.id)}>
+            {tab.label}
           </button>
         ))}
       </div>
@@ -413,11 +514,27 @@ export default function CaseDetail() {
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                             <Shield size={13} style={{ color: colors.text }} />
                             <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>
                               {event.detail || event.eventType || 'Event'}
                             </span>
+
+                            {event.threatIntel && event.threatIntel.score > 0 && (
+                              <span className={`threat-badge ${event.threatIntel.score >= 75 ? 'critical' : 'warning'}`}>
+                                IOC: {event.threatIntel.score}%
+                              </span>
+                            )}
+
+                            {event.mitreAttack && event.mitreAttack.techniqueId && (
+                              <span style={{
+                                fontSize: '0.68rem', color: '#d1b3ff', background: 'rgba(136,0,255,0.08)',
+                                border: '1px solid rgba(136,0,255,0.2)', padding: '2px 6px', borderRadius: 4,
+                                fontFamily: 'var(--font-mono)'
+                              }}>
+                                {event.mitreAttack.techniqueId} - {event.mitreAttack.techniqueName}
+                              </span>
+                            )}
                           </div>
                           <span style={{
                             fontSize: '0.7rem', color: colors.text, fontFamily: 'var(--font-mono)',
@@ -425,6 +542,11 @@ export default function CaseDetail() {
                             border: `1px solid ${colors.border}`,
                           }}>{sev}</span>
                         </div>
+                        {event.threatIntel && event.threatIntel.details && (
+                          <div style={{ fontSize: '0.74rem', color: 'var(--accent-warning)', marginTop: 4, display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <Globe size={11} /> {event.threatIntel.details}
+                          </div>
+                        )}
                         <div style={{ display: 'flex', gap: 16, fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
                           {timeDisplay && <span><Clock size={11} style={{ marginRight: 3 }} />{timeDisplay}</span>}
                           {event.source && <span style={{ fontFamily: 'var(--font-mono)' }}>{event.source}</span>}
@@ -437,6 +559,314 @@ export default function CaseDetail() {
               ))}
             </div>
           )}
+        </motion.div>
+      )}
+
+      {/* MITRE ATT&CK Tab */}
+      {activeTab === 'mitre' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <div className="section-header">
+            <div className="section-title">MITRE ATT&CK TTP Correlation</div>
+          </div>
+          
+          <div className="mitre-matrix-grid">
+            {(() => {
+              const activeTechniques = {}
+              evidence.forEach(ev => {
+                if (ev.parsedData?.events) {
+                  ev.parsedData.events.forEach(e => {
+                    if (e.mitreAttack?.techniqueId) {
+                      activeTechniques[e.mitreAttack.techniqueId] = {
+                        id: e.mitreAttack.techniqueId,
+                        name: e.mitreAttack.techniqueName,
+                        tactic: e.mitreAttack.tactic,
+                        count: (activeTechniques[e.mitreAttack.techniqueId]?.count || 0) + 1
+                      }
+                    }
+                  })
+                }
+              })
+              
+              const tactics = [
+                { name: 'Execution', techniques: [{ id: 'T1059', name: 'Command & Scripting Interpreter' }] },
+                { name: 'Privilege Escalation', techniques: [{ id: 'T1548.001', name: 'Sudo/Su Abuse' }] },
+                { name: 'Credential Access', techniques: [{ id: 'T1110', name: 'Brute Force' }] },
+                { name: 'Defense Evasion', techniques: [{ id: 'T1078', name: 'Valid Accounts' }] },
+                { name: 'Discovery', techniques: [{ id: 'T1033', name: 'System Owner Discovery' }, { id: 'T1046', name: 'Network Service Discovery' }] },
+                { name: 'Command & Control', techniques: [{ id: 'T1105', name: 'Ingress Tool Transfer' }] },
+                { name: 'Exfiltration', techniques: [{ id: 'T1041', name: 'Exfiltration over C2' }] }
+              ]
+              
+              return tactics.map((tac, ti) => (
+                <div key={ti} className="mitre-tactic-column">
+                  <div className="mitre-tactic-header">{tac.name}</div>
+                  {tac.techniques.map((tech, tei) => {
+                    const active = activeTechniques[tech.id]
+                    return (
+                      <div key={tei} className={`mitre-technique-card ${active ? 'active' : ''}`}>
+                        <span className="mitre-technique-id">{tech.id}</span>
+                        <div style={{ fontWeight: active ? 600 : 400 }}>{tech.name}</div>
+                        {active && (
+                          <div style={{ fontSize: '0.68rem', color: '#d1b3ff', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
+                            {active.count} matches detected
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              ))
+            })()}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Forensic Chat Tab */}
+      {activeTab === 'chat' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <div className="section-header">
+            <div className="section-title">Forensic Chat Copilot (RAG)</div>
+          </div>
+          
+          <div className="chat-container">
+            <div className="chat-messages">
+              {chatMessages.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', textAlign: 'center', gap: 10, padding: 20 }}>
+                  <MessageSquare size={32} style={{ color: 'var(--accent-primary)', opacity: 0.7 }} />
+                  <div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Interactive Log Assistant</div>
+                    <div style={{ fontSize: '0.82rem', marginTop: 4, maxWidth: 360 }}>Ask questions directly about IP addresses, brute-force logs, or privilege escalations in this case.</div>
+                  </div>
+                </div>
+              ) : (
+                chatMessages.map((msg, idx) => (
+                  <div key={idx} className={`chat-message ${msg.role}`}>
+                    <div className="chat-message-meta">{msg.role === 'user' ? 'Investigator' : 'Forensic Copilot'}</div>
+                    <div className="chat-message-content">{renderMarkdown(msg.content)}</div>
+                    
+                    {msg.sources && msg.sources.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <div className="chat-sources-header">Retrieved Evidence Citations ({msg.sources.length})</div>
+                        <div className="chat-sources-list">
+                          {msg.sources.map((src, si) => (
+                            <div key={si} className="chat-source-badge" onClick={() => setSelectedSources(src)} title={src.detail}>
+                              {src.mitreAttack?.techniqueId ? `${src.mitreAttack.techniqueId} ` : ''}{src.source} · {src.timestamp?.split(' ')[1] || 'log'}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+              {chatLoading && (
+                <div className="chat-message assistant" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> Processing case files...
+                </div>
+              )}
+            </div>
+            
+            {chatMessages.length === 0 && (
+              <div className="chat-suggested">
+                {[
+                  'Did you detect any brute force logins?',
+                  'Show all events with high threat scores',
+                  'Find any privilege escalation commands',
+                  'Give me a summary of the timeline'
+                ].map((chip, ci) => (
+                  <div key={ci} className="chat-suggested-chip" onClick={() => handleSendChatMessage(null, chip)}>
+                    {chip}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <form onSubmit={handleSendChatMessage} className="chat-input-container">
+              <input
+                className="form-input"
+                style={{ flex: 1, marginBottom: 0 }}
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                placeholder="Ask about logins, IPs, specific tools..."
+                disabled={chatLoading}
+              />
+              <button type="submit" className="btn btn-primary" style={{ padding: '0 20px' }} disabled={chatLoading}>
+                <Send size={15} />
+              </button>
+            </form>
+          </div>
+
+          {selectedSources && (
+            <div className="modal-backdrop" onClick={() => setSelectedSources(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+              <div className="glow-card" style={{ maxWidth: 600, width: '100%' }} onClick={e => e.stopPropagation()}>
+                <div className="glow-card-inner" style={{ padding: 24 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Evidence Citation Details</h3>
+                    <button className="btn btn-secondary btn-sm" style={{ padding: 4 }} onClick={() => setSelectedSources(null)}><X size={16} /></button>
+                  </div>
+                  <div style={{ display: 'grid', gap: 12, fontSize: '0.85rem' }}>
+                    <div>
+                      <strong style={{ color: 'var(--text-muted)' }}>Evidence File:</strong> {selectedSources.evidenceName}
+                    </div>
+                    <div>
+                      <strong style={{ color: 'var(--text-muted)' }}>Source / Host:</strong> {selectedSources.source}
+                    </div>
+                    <div>
+                      <strong style={{ color: 'var(--text-muted)' }}>Timestamp:</strong> {selectedSources.timestamp}
+                    </div>
+                    {selectedSources.severity && (
+                      <div>
+                        <strong style={{ color: 'var(--text-muted)' }}>Severity:</strong> <span className="tag">{selectedSources.severity}</span>
+                      </div>
+                    )}
+                    {selectedSources.mitreAttack?.techniqueId && (
+                      <div>
+                        <strong style={{ color: 'var(--text-muted)' }}>MITRE ATT&CK:</strong> <span style={{ color: '#d1b3ff', background: 'rgba(136,0,255,0.08)', padding: '2px 8px', borderRadius: 4 }}>{selectedSources.mitreAttack.techniqueId} - {selectedSources.mitreAttack.techniqueName} ({selectedSources.mitreAttack.tactic})</span>
+                      </div>
+                    )}
+                    {selectedSources.threatIntel?.score > 0 && (
+                      <div>
+                        <strong style={{ color: 'var(--text-muted)' }}>Threat Intelligence:</strong> <span className="tag danger">Score {selectedSources.threatIntel.score}% - {selectedSources.threatIntel.details}</span>
+                      </div>
+                    )}
+                    <div style={{ marginTop: 8 }}>
+                      <strong style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Event Log Detail:</strong>
+                      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-primary)', padding: 12, borderRadius: 6, fontFamily: 'var(--font-mono)', fontSize: '0.78rem', wordBreak: 'break-all' }}>
+                        {selectedSources.detail}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* Threat Intelligence Tab */}
+      {activeTab === 'threatIntel' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <div className="section-header">
+            <div className="section-title">Threat Intelligence & Reputation Feed</div>
+          </div>
+
+          {/* API Keys status banner */}
+          {intelStatus.abuseIpDbConfigured && intelStatus.virusTotalConfigured ? (
+            <div className="glow-card" style={{ marginBottom: 24, border: '1px solid rgba(0,230,118,0.2)' }}>
+              <div className="glow-card-inner" style={{ padding: '12px 20px', background: 'rgba(0,230,118,0.02)' }}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <CheckCircle size={18} style={{ color: '#00e676', flexShrink: 0 }} />
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                    <strong style={{ color: 'var(--text-primary)' }}>Threat Intelligence Integrations Active:</strong> Real-time checks with AbuseIPDB and VirusTotal are operational.
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="glow-card" style={{ marginBottom: 24, border: '1px solid rgba(255,171,64,0.15)' }}>
+              <div className="glow-card-inner" style={{ padding: '16px 20px', background: 'rgba(255,171,64,0.02)' }}>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <AlertTriangle size={18} style={{ color: 'var(--accent-warning)', flexShrink: 0, marginTop: 2 }} />
+                  <div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.88rem' }}>Threat Intelligence API Setup</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.4 }}>
+                      To configure real-time reputation queries, specify the following free API keys in your server's <code style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 4px', borderRadius: 3 }}>.env</code> file:
+                      <ul style={{ margin: '6px 0', paddingLeft: 18 }}>
+                        <li><strong style={{ color: 'var(--text-primary)' }}>ABUSEIPDB_API_KEY</strong> {intelStatus.abuseIpDbConfigured ? '✅ Detected' : '(Free: 1,000 requests/day at abuseipdb.com)'} — For validating public IP address reputations.</li>
+                        <li><strong style={{ color: 'var(--text-primary)' }}>VIRUSTOTAL_API_KEY</strong> {intelStatus.virusTotalConfigured ? '✅ Detected' : '(Free: 4 requests/min, 500 requests/day at virustotal.com)'} — For analyzing file md5/sha256 signature reputations.</li>
+                      </ul>
+                      Currently, the application is performing automated detection using local threat signatures, Tor exit-node caches, and deterministic simulation fallbacks.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* List of detected Threat IOCs */}
+          {(() => {
+            const iocs = []
+            const seen = new Set()
+
+            evidence.forEach(ev => {
+              if (ev.parsedData?.events) {
+                ev.parsedData.events.forEach(e => {
+                  if (e.threatIntel && e.threatIntel.score > 0) {
+                    let value = 'Unknown IOC'
+                    let type = 'Malicious Hash'
+                    
+                    const ipMatch = e.detail.match(/\b((?:[0-9]{1,3}\.){3}[0-9]{1,3})\b/)
+                    if (ipMatch) {
+                      value = ipMatch[1]
+                      type = 'IP Reputation'
+                    } else {
+                      const hashMatch = e.detail.match(/\b([a-fA-F0-9]{32})\b/)
+                      if (hashMatch) {
+                        value = hashMatch[1]
+                        type = 'Malware Hash'
+                      }
+                    }
+
+                    const key = `${type}-${value}`
+                    if (!seen.has(key)) {
+                      seen.add(key)
+                      iocs.push({
+                        value,
+                        type,
+                        score: e.threatIntel.score,
+                        details: e.threatIntel.details,
+                        evidenceName: ev.name,
+                        timestamp: e.timestamp
+                      })
+                    }
+                  }
+                })
+              }
+            })
+
+            if (iocs.length === 0) {
+              return (
+                <div className="empty-state" style={{ padding: '40px 20px' }}>
+                  <div className="empty-state-icon"><Globe size={32} /></div>
+                  <div className="empty-state-title">No Malicious IOCs Detected</div>
+                  <div className="empty-state-text">No IP addresses or file hashes scored above the threshold in this case's evidence logs.</div>
+                </div>
+              )
+            }
+
+            return (
+              <div className="data-table-wrapper">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>IOC Indicator</th>
+                      <th>Type</th>
+                      <th>Risk Score</th>
+                      <th>Reputation Details</th>
+                      <th>Evidence File</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {iocs.map((ioc, idx) => (
+                      <tr key={idx}>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', fontWeight: 600 }}>
+                          {ioc.value}
+                        </td>
+                        <td><span className="tag">{ioc.type}</span></td>
+                        <td>
+                          <span className={`threat-badge ${ioc.score >= 75 ? 'critical' : 'warning'}`}>
+                            {ioc.score}% Risk
+                          </span>
+                        </td>
+                        <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{ioc.details}</td>
+                        <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{ioc.evidenceName}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          })()}
         </motion.div>
       )}
 
