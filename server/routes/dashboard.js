@@ -25,6 +25,39 @@ router.get('/stats', optionalAuth, async (req, res, next) => {
       Evidence.countDocuments({ status: 'error' }),
     ])
 
+    // Calculate new feature stats (IOCs, Critical Threat Flags)
+    const evidenceList = await Evidence.find({}, 'parsedData.events').lean()
+    let totalIocs = 0
+    let criticalThreats = 0
+    const uniqueIocs = new Set()
+
+    for (const ev of evidenceList) {
+      if (ev.parsedData?.events) {
+        for (const e of ev.parsedData.events) {
+          if (e.threatIntel && e.threatIntel.score > 0) {
+            let value = null
+            // Extract IP
+            const ipMatch = e.detail?.match(/\b((?:[0-9]{1,3}\.){3}[0-9]{1,3})\b/)
+            if (ipMatch) {
+              value = ipMatch[1]
+            } else {
+              const hashMatch = e.detail?.match(/\b([a-fA-F0-9]{32})\b|\b([a-fA-F0-9]{64})\b/)
+              if (hashMatch) {
+                value = hashMatch[1] || hashMatch[2]
+              }
+            }
+            if (value) {
+              uniqueIocs.add(value)
+              if (e.threatIntel.score >= 90) {
+                criticalThreats++
+              }
+            }
+          }
+        }
+      }
+    }
+    totalIocs = uniqueIocs.size
+
     // Monthly case activity for chart (last 7 months)
     const now = new Date()
     const months = []
@@ -62,6 +95,8 @@ router.get('/stats', optionalAuth, async (req, res, next) => {
         closedCases,
         draftCases,
         draftReports,
+        totalIocs,
+        criticalThreats,
       },
       caseActivity: months,
       evidenceTypes: evidenceTypes.length > 0 ? evidenceTypes : [

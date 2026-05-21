@@ -131,43 +131,24 @@ function AboutContent() {
 function PrivacyContent() {
   return (
     <>
-      <SectionCard icon={Eye} title="Information We Collect">
-        <p>ForensicAI collects the following types of information to provide and improve the platform:</p>
+      <SectionCard icon={Eye} title="Data Collection & Usage">
+        <p>
+          ForensicAI collects necessary administrative and investigative data to run the platform:
+        </p>
         <ul style={{ listStyle: 'none', padding: 0, marginTop: 12 }}>
-          <ListItem><strong>Account Information</strong> — Name, email address, role, and organization when you register.</ListItem>
-          <ListItem><strong>Authentication Data</strong> — Hashed passwords, session tokens, 2FA secrets (encrypted), and passkey credentials.</ListItem>
-          <ListItem><strong>Evidence Files</strong> — Log files, CSVs, and other forensic artifacts you upload for analysis. These are stored securely on the server.</ListItem>
-          <ListItem><strong>Usage Data</strong> — Actions performed within the platform (audit logs), including timestamps, IP addresses, and user agents.</ListItem>
-          <ListItem><strong>AI Interaction Data</strong> — Prompts sent to AI providers for report generation (evidence data is included in prompts).</ListItem>
+          <ListItem><strong>Account & Auth</strong> — Name, email, role, and organization. Credentials are hashed via bcrypt; sessions are managed securely via JWT.</ListItem>
+          <ListItem><strong>Evidence & Timelines</strong> — Log files, CSVs, and text documents uploaded for parsing, indexing, and case timeline construction.</ListItem>
+          <ListItem><strong>Audit Logs</strong> — Record of all user actions (login, uploads, audit trials) to ensure investigation accountability.</ListItem>
         </ul>
       </SectionCard>
 
-      <SectionCard icon={Lock} title="How We Use Your Data" accent="#7b61ff">
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          <ListItem>To authenticate and authorize your access to the platform</ListItem>
-          <ListItem>To parse, analyze, and generate reports from uploaded evidence</ListItem>
-          <ListItem>To maintain audit trails for accountability and compliance</ListItem>
-          <ListItem>To improve AI-generated output quality for forensic reports</ListItem>
-          <ListItem>To send notifications related to your investigation activities</ListItem>
-        </ul>
-      </SectionCard>
-
-      <SectionCard icon={Database} title="Data Storage & Security" accent="#00e676">
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          <ListItem>All data is stored in encrypted MongoDB databases</ListItem>
-          <ListItem>Passwords are hashed using bcrypt with salt rounds</ListItem>
-          <ListItem>Evidence files are stored on the server with SHA-256 integrity hashes</ListItem>
-          <ListItem>JWT tokens are used for session management with configurable expiration</ListItem>
-          <ListItem>All API communications use HTTPS in production environments</ListItem>
-          <ListItem>Two-factor authentication (TOTP) and WebAuthn passkeys are available for enhanced security</ListItem>
-        </ul>
-      </SectionCard>
-
-      <SectionCard icon={Globe} title="Third-Party Services" accent="#ffab40">
-        <p>ForensicAI may share limited data with the following third-party services:</p>
+      <SectionCard icon={Globe} title="External Integrations & Data Flows" accent="#ffab40">
+        <p>
+          To enrich investigation data, ForensicAI integrates with the following third-party APIs:
+        </p>
         <ul style={{ listStyle: 'none', padding: 0, marginTop: 12 }}>
-          <ListItem><strong>AI Providers</strong> (OpenAI, Google Gemini, Mistral) — Evidence data is sent as part of AI prompts for report generation. Only the configured provider receives data.</ListItem>
-          <ListItem><strong>MongoDB Atlas</strong> (if cloud-hosted) — Database hosting with encryption at rest.</ListItem>
+          <ListItem><strong>Threat Intelligence</strong> — IP addresses are queried against <Highlight>AbuseIPDB</Highlight> and file hashes against <Highlight>VirusTotal</Highlight> to identify known threat indicators (IOCs).</ListItem>
+          <ListItem><strong>RAG Copilot & AI Summarizer</strong> — Selected log segments and prompts are sent to your configured LLM provider (<Highlight>OpenAI, Gemini, or Mistral</Highlight>) to compile reports and answer case questions.</ListItem>
         </ul>
         <div style={{
           background: 'rgba(255,171,64,0.08)', border: '1px solid rgba(255,171,64,0.2)',
@@ -175,24 +156,19 @@ function PrivacyContent() {
           fontSize: '0.82rem', display: 'flex', alignItems: 'flex-start', gap: 10,
         }}>
           <AlertTriangle size={16} style={{ color: 'var(--accent-warning)', flexShrink: 0, marginTop: 2 }} />
-          <span>Evidence data sent to AI providers is processed according to their respective privacy policies. Review your AI provider's data handling practices before uploading sensitive evidence.</span>
+          <span>No raw log files are shared globally. Only specific extracted indicators (IPs, hashes) or RAG retrieval context are queried to third-party endpoints based on your active keys.</span>
         </div>
       </SectionCard>
 
-      <SectionCard icon={CheckCircle} title="Your Rights" accent="#00d4ff">
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          <ListItem><strong>Access</strong> — You can view all your data through the Settings and Audit pages</ListItem>
-          <ListItem><strong>Correction</strong> — Update your profile information at any time via Settings</ListItem>
-          <ListItem><strong>Deletion</strong> — Contact an administrator to request account and data deletion</ListItem>
-          <ListItem><strong>Export</strong> — Download your reports as PDF documents</ListItem>
-          <ListItem><strong>Restrict Processing</strong> — You may choose not to use AI features and write reports manually</ListItem>
-        </ul>
-      </SectionCard>
-
-      <SectionCard>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          <strong>Last Updated:</strong> {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} &nbsp;·&nbsp;
-          For questions about this privacy policy, contact <Highlight>privacy@forensicai.dev</Highlight>
+      <SectionCard icon={Lock} title="Data Security & Rights" accent="#00e676">
+        <p>
+          Data is stored in encrypted databases. Passwords use salted hashing. All API communication uses HTTPS.
+        </p>
+        <p style={{ marginTop: 10 }}>
+          Users retain full rights to access their audits, modify their settings, or request administrators to delete uploaded case evidence. AI analysis can be disabled by toggling automatic generation settings off.
+        </p>
+        <p style={{ marginTop: 14, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          <strong>Last Updated:</strong> {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} &nbsp;·&nbsp; Support: <Highlight>privacy@forensicai.dev</Highlight>
         </p>
       </SectionCard>
     </>
@@ -204,37 +180,34 @@ function PrivacyContent() {
 function TermsContent() {
   return (
     <>
-      <SectionCard icon={FileText} title="1. Acceptance of Terms">
+      <SectionCard icon={FileText} title="Acceptance & Permitted Use">
         <p>
-          By accessing or using ForensicAI ("the Platform"), you agree to be bound by these Terms of Use.
-          If you do not agree to these terms, do not use the Platform. These terms apply to all users,
-          including investigators, analysts, administrators, and viewers.
+          ForensicAI is built for <Highlight>lawful digital forensics investigations</Highlight>. By logging in, you agree to:
         </p>
-      </SectionCard>
-
-      <SectionCard icon={Shield} title="2. Permitted Use" accent="#7b61ff">
-        <p>ForensicAI is designed for <Highlight>lawful digital forensics investigations</Highlight>. You agree to:</p>
         <ul style={{ listStyle: 'none', padding: 0, marginTop: 12 }}>
-          <ListItem>Use the Platform only for authorized forensic investigations</ListItem>
-          <ListItem>Comply with all applicable local, state, national, and international laws</ListItem>
-          <ListItem>Maintain the confidentiality of investigation data and evidence</ListItem>
-          <ListItem>Not upload malicious files intended to compromise the Platform</ListItem>
-          <ListItem>Not attempt to reverse-engineer, decompile, or disassemble the Platform</ListItem>
-          <ListItem>Not share your credentials or allow unauthorized access to your account</ListItem>
+          <ListItem>Use the Platform only for authorized evidence analysis under legal chain-of-custody.</ListItem>
+          <ListItem>Never upload malicious payloads intended to harm the system infrastructure.</ListItem>
+          <ListItem>Maintain strict confidentiality of credentials, API keys, and parsed case investigations.</ListItem>
         </ul>
       </SectionCard>
 
-      <SectionCard icon={Brain} title="3. AI-Generated Content" accent="#00e676">
+      <SectionCard icon={Shield} title="Evidence Sharing & Third-Party APIs" accent="#7b61ff">
         <p>
-          The Platform uses artificial intelligence to assist with report generation, evidence analysis, and
-          findings summarization. By using these features, you acknowledge and agree that:
+          When enabling Threat Intelligence (AbuseIPDB, VirusTotal) or AI engine endpoints, you acknowledge that:
         </p>
         <ul style={{ listStyle: 'none', padding: 0, marginTop: 12 }}>
-          <ListItem>AI-generated content is provided as <strong>draft material only</strong> and must be reviewed by a qualified human investigator</ListItem>
-          <ListItem>AI may produce inaccurate, incomplete, or misleading output — <strong>independent verification is required</strong></ListItem>
-          <ListItem>ForensicAI and its developers are <strong>not liable</strong> for decisions made based on AI-generated content</ListItem>
-          <ListItem>AI-generated sections are clearly labeled in reports for transparency</ListItem>
-          <ListItem>Evidence data is sent to third-party AI providers for processing</ListItem>
+          <ListItem>You must possess the proper authorization to transmit extracted IPs and file hashes to external feeds.</ListItem>
+          <ListItem>API communications are governed by the respective providers' developer policies and data usage terms.</ListItem>
+        </ul>
+      </SectionCard>
+
+      <SectionCard icon={Brain} title="AI Copilot Disclaimer & Liability" accent="#ff5252">
+        <p>
+          AI-generated summaries, key findings, and RAG chatbot answers are <strong>investigative aids only</strong>.
+        </p>
+        <ul style={{ listStyle: 'none', padding: 0, marginTop: 12 }}>
+          <ListItem><strong>Human-in-the-Loop Required</strong> — AI findings do not constitute legal evidence or expert testimony and must be validated by a certified forensic examiner.</ListItem>
+          <ListItem><strong>No Warranty</strong> — ForensicAI is provided "as is". Developers are not liable for incorrect analysis, data exfiltration from external LLMs, or case decisions made using automated outputs.</ListItem>
         </ul>
         <div style={{
           background: 'rgba(255,82,82,0.08)', border: '1px solid rgba(255,82,82,0.2)',
@@ -242,44 +215,9 @@ function TermsContent() {
           fontSize: '0.82rem', display: 'flex', alignItems: 'flex-start', gap: 10,
         }}>
           <AlertTriangle size={16} style={{ color: '#ff5252', flexShrink: 0, marginTop: 2 }} />
-          <span><strong>Legal Disclaimer:</strong> AI-generated forensic reports do not constitute legal advice, expert testimony, or conclusive findings. They are investigative aids that require human validation.</span>
+          <span><strong>Legal Disclaimer:</strong> AI-generated outputs are draft materials. Final findings must rely on verified file signatures, system logs, and human expertise.</span>
         </div>
-      </SectionCard>
-
-      <SectionCard icon={Database} title="4. Evidence & Data Handling" accent="#ffab40">
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          <ListItem>You are responsible for ensuring you have legal authority to upload and analyze evidence files</ListItem>
-          <ListItem>All uploaded files are hashed with SHA-256 for integrity verification</ListItem>
-          <ListItem>Evidence files are stored on the server and may be deleted by authorized users</ListItem>
-          <ListItem>The Platform maintains audit logs of all evidence-related actions</ListItem>
-          <ListItem>You must comply with chain-of-custody requirements applicable to your jurisdiction</ListItem>
-        </ul>
-      </SectionCard>
-
-      <SectionCard icon={Lock} title="5. Account Security">
-        <p>You are responsible for maintaining the security of your account. This includes:</p>
-        <ul style={{ listStyle: 'none', padding: 0, marginTop: 12 }}>
-          <ListItem>Using a strong, unique password</ListItem>
-          <ListItem>Enabling two-factor authentication (recommended)</ListItem>
-          <ListItem>Not sharing login credentials with unauthorized individuals</ListItem>
-          <ListItem>Reporting suspected unauthorized access immediately</ListItem>
-        </ul>
-      </SectionCard>
-
-      <SectionCard title="6. Limitation of Liability">
-        <p>
-          ForensicAI is provided <strong>"as is"</strong> without warranties of any kind, express or implied.
-          The developers shall not be liable for any loss, damage, or harm arising from the use of the Platform,
-          including but not limited to incorrect AI outputs, data loss, service interruptions, or unauthorized access.
-        </p>
-      </SectionCard>
-
-      <SectionCard title="7. Modifications">
-        <p>
-          We reserve the right to modify these Terms of Use at any time. Users will be notified of significant
-          changes through the Platform's notification system. Continued use after changes constitutes acceptance.
-        </p>
-        <p style={{ marginTop: 12, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+        <p style={{ marginTop: 14, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
           <strong>Last Updated:</strong> {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
       </SectionCard>
@@ -292,91 +230,72 @@ function TermsContent() {
 function CookiesContent() {
   return (
     <>
-      <SectionCard icon={Cookie} title="What Are Cookies?">
+      <SectionCard icon={Cookie} title="Essential Local Storage">
         <p>
-          Cookies are small text files stored on your device when you visit a website. ForensicAI uses
-          cookies and similar local storage mechanisms to provide essential functionality, maintain your
-          session, and remember your preferences.
+          ForensicAI does <strong>not</strong> use third-party tracking, advertising, or profiling cookies.
+          We store the following variables locally on your machine to sustain basic session security and accessibility:
         </p>
-      </SectionCard>
-
-      <SectionCard icon={CheckCircle} title="Cookies We Use" accent="#7b61ff">
-        <div style={{ display: 'grid', gap: 12, marginTop: 8 }}>
+        <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
           {[
             {
               name: 'forensic_token',
-              type: 'Essential',
-              purpose: 'Stores your authentication JWT token to keep you logged in across page refreshes.',
-              duration: 'Session / 7 days',
+              type: 'Security',
+              purpose: 'JSON Web Token (JWT) securing your active authenticated session.',
+              duration: '7 Days',
               color: '#00d4ff',
             },
             {
               name: 'forensic_user',
-              type: 'Essential',
-              purpose: 'Stores basic user profile data (name, email, role) for UI display without additional API calls.',
-              duration: 'Session / 7 days',
-              color: '#00d4ff',
+              type: 'Preference',
+              purpose: 'Stores visual identity metrics (name, email, role) to personalize the dashboard.',
+              duration: '7 Days',
+              color: '#7b61ff',
             },
             {
               name: 'forensicai-theme',
-              type: 'Preference',
-              purpose: 'Remembers your selected theme (dark/light mode) so it persists between visits.',
+              type: 'UX State',
+              purpose: 'Persists dark/light design preferences across site reloads.',
               duration: 'Persistent',
-              color: '#7b61ff',
+              color: '#00e676',
             },
-          ].map((cookie, i) => (
+          ].map((item, i) => (
             <div key={i} style={{
               background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-md)',
-              padding: '14px 18px', border: '1px solid var(--border-subtle)',
+              padding: '12px 16px', border: '1px solid var(--border-subtle)',
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <code style={{ fontSize: '0.82rem', color: cookie.color, background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: 4 }}>
-                  {cookie.name}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <code style={{ fontSize: '0.82rem', color: item.color, background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: 4 }}>
+                  {item.name}
                 </code>
                 <span style={{
-                  fontSize: '0.7rem', padding: '2px 10px', borderRadius: 10,
-                  background: `${cookie.color}15`, color: cookie.color,
-                  border: `1px solid ${cookie.color}30`, fontWeight: 600,
+                  fontSize: '0.68rem', padding: '2px 8px', borderRadius: 8,
+                  background: `${item.color}15`, color: item.color,
+                  border: `1px solid ${item.color}30`, fontWeight: 600,
                 }}>
-                  {cookie.type}
+                  {item.type}
                 </span>
               </div>
-              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 4 }}>{cookie.purpose}</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Duration: {cookie.duration}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.purpose}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4 }}>Lifespan: {item.duration}</div>
             </div>
           ))}
         </div>
       </SectionCard>
 
-      <SectionCard icon={Globe} title="Third-Party Cookies" accent="#00e676">
+      <SectionCard icon={Lock} title="Managing Storage" accent="#ffab40">
         <p>
-          ForensicAI does <strong>not</strong> use any third-party tracking cookies, advertising cookies,
-          or analytics cookies. We do not track your browsing activity across other websites. All data
-          stored locally is strictly for platform functionality.
+          You can restrict local storage tokens by logging out (which immediately clears authentication data) or by executing "Clear site data" inside your web browser developer settings.
         </p>
-      </SectionCard>
-
-      <SectionCard icon={Lock} title="Managing Cookies" accent="#ffab40">
-        <p>You can manage cookies through the following methods:</p>
-        <ul style={{ listStyle: 'none', padding: 0, marginTop: 12 }}>
-          <ListItem><strong>Browser Settings</strong> — Use your browser's privacy settings to view, block, or delete cookies</ListItem>
-          <ListItem><strong>Logout</strong> — Logging out removes your authentication token from local storage</ListItem>
-          <ListItem><strong>Clear Site Data</strong> — Use your browser's "Clear site data" option to remove all ForensicAI data</ListItem>
-        </ul>
         <div style={{
           background: 'rgba(0,212,255,0.06)', border: '1px solid rgba(0,212,255,0.15)',
           borderRadius: 'var(--radius-md)', padding: '12px 16px', marginTop: 14,
           fontSize: '0.82rem', display: 'flex', alignItems: 'flex-start', gap: 10,
         }}>
           <Info size={16} style={{ color: 'var(--accent-primary)', flexShrink: 0, marginTop: 2 }} />
-          <span>Disabling essential cookies will prevent you from logging in and using the Platform.</span>
+          <span>Note: Blocking local storage will terminate active login capability and disable dashboard visualization filters.</span>
         </div>
-      </SectionCard>
-
-      <SectionCard>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          <strong>Last Updated:</strong> {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} &nbsp;·&nbsp;
-          For questions about this cookies policy, contact <Highlight>privacy@forensicai.dev</Highlight>
+        <p style={{ marginTop: 14, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          <strong>Last Updated:</strong> {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
       </SectionCard>
     </>

@@ -21,6 +21,12 @@ const userSchema = new mongoose.Schema({
     aiTone: { type: String, default: 'neutral' },
     aiAutoGenerate: { type: Boolean, default: false },
     aiRequireApproval: { type: Boolean, default: true },
+    // Threat Intelligence
+    abuseIpDbApiKey: { type: String, default: '' },
+    virusTotalApiKey: { type: String, default: '' },
+    threatSeverityThreshold: { type: Number, default: 50, min: 0, max: 100 },
+    // RAG Context
+    ragContextLimit: { type: Number, default: 25, min: 5, max: 100 },
     // Security
     twoFactorEnabled: { type: Boolean, default: false },
     sessionTimeout: { type: Number, default: 30 },

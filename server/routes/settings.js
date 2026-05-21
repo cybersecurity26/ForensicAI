@@ -143,6 +143,10 @@ router.get('/ai', optionalAuth, async (req, res, next) => {
       tone: user.settings.aiTone,
       autoGenerate: user.settings.aiAutoGenerate,
       requireApproval: user.settings.aiRequireApproval,
+      abuseIpDbApiKey: user.settings.abuseIpDbApiKey ? '••••' + user.settings.abuseIpDbApiKey.slice(-4) : '',
+      virusTotalApiKey: user.settings.virusTotalApiKey ? '••••' + user.settings.virusTotalApiKey.slice(-4) : '',
+      threatSeverityThreshold: user.settings.threatSeverityThreshold,
+      ragContextLimit: user.settings.ragContextLimit,
     })
   } catch (err) {
     next(err)
@@ -152,20 +156,28 @@ router.get('/ai', optionalAuth, async (req, res, next) => {
 // PUT /api/settings/ai — Update AI engine configuration
 router.put('/ai', optionalAuth, async (req, res, next) => {
   try {
-    const { provider, model, apiKey, temperature, maxTokens, tone, autoGenerate, requireApproval } = req.body
+    const {
+      provider, model, apiKey, temperature, maxTokens, tone, autoGenerate, requireApproval,
+      abuseIpDbApiKey, virusTotalApiKey, threatSeverityThreshold, ragContextLimit
+    } = req.body
     const user = await getUser(req)
 
     if (provider) user.settings.aiProvider = provider
     if (model) user.settings.aiModel = model
-    if (apiKey) user.settings.aiApiKey = apiKey
+    if (apiKey !== undefined && !apiKey.startsWith('••••')) user.settings.aiApiKey = apiKey
     if (temperature !== undefined) user.settings.aiTemperature = temperature
     if (maxTokens !== undefined) user.settings.aiMaxTokens = maxTokens
     if (tone) user.settings.aiTone = tone
     if (autoGenerate !== undefined) user.settings.aiAutoGenerate = autoGenerate
     if (requireApproval !== undefined) user.settings.aiRequireApproval = requireApproval
 
+    if (abuseIpDbApiKey !== undefined && !abuseIpDbApiKey.startsWith('••••')) user.settings.abuseIpDbApiKey = abuseIpDbApiKey
+    if (virusTotalApiKey !== undefined && !virusTotalApiKey.startsWith('••••')) user.settings.virusTotalApiKey = virusTotalApiKey
+    if (threatSeverityThreshold !== undefined) user.settings.threatSeverityThreshold = threatSeverityThreshold
+    if (ragContextLimit !== undefined) user.settings.ragContextLimit = ragContextLimit
+
     await user.save()
-    await logAudit('ai_config_updated', 'user', user._id, `AI config updated: ${provider || user.settings.aiProvider}`, req)
+    await logAudit('ai_config_updated', 'user', user._id, `AI & Threat config updated`, req)
 
     res.json({
       provider: user.settings.aiProvider,
@@ -176,6 +188,10 @@ router.put('/ai', optionalAuth, async (req, res, next) => {
       tone: user.settings.aiTone,
       autoGenerate: user.settings.aiAutoGenerate,
       requireApproval: user.settings.aiRequireApproval,
+      abuseIpDbApiKey: user.settings.abuseIpDbApiKey ? '••••' + user.settings.abuseIpDbApiKey.slice(-4) : '',
+      virusTotalApiKey: user.settings.virusTotalApiKey ? '••••' + user.settings.virusTotalApiKey.slice(-4) : '',
+      threatSeverityThreshold: user.settings.threatSeverityThreshold,
+      ragContextLimit: user.settings.ragContextLimit,
     })
   } catch (err) {
     next(err)

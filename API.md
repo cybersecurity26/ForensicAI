@@ -468,7 +468,11 @@ Update AI provider configuration. 🔒 **Requires Auth**
   "provider": "gemini",
   "model": "gemini-1.5-flash",
   "temperature": 0.3,
-  "maxTokens": 2048
+  "maxTokens": 2048,
+  "abuseIpDbApiKey": "your_abuseipdb_api_key_here",
+  "virusTotalApiKey": "your_virustotal_api_key_here",
+  "threatSeverityThreshold": 50,
+  "ragContextLimit": 25
 }
 ```
 

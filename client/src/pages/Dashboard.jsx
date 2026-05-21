@@ -73,6 +73,8 @@ export default function Dashboard() {
         setStats([
           { label: 'Active Cases', value: String(s.activeCases || 0), icon: FolderOpen, color: 'cyan', trend: `${s.totalCases || 0} total`, up: true },
           { label: 'Evidence Files', value: String(s.totalEvidence || 0), icon: Database, color: 'purple', trend: 'Uploaded', up: true },
+          { label: 'Threat Indicators', value: String(s.totalIocs || 0), icon: Shield, color: 'orange', trend: 'Across cases', up: true },
+          { label: 'Critical Threat Flags', value: String(s.criticalThreats || 0), icon: AlertTriangle, color: 'red', trend: s.criticalThreats > 0 ? 'Requires action' : 'All clear', up: s.criticalThreats === 0 },
           { label: 'Reports Generated', value: String(s.totalReports || 0), icon: FileText, color: 'green', trend: `${s.draftReports || 0} drafts`, up: true },
           { label: 'Integrity Alerts', value: String(s.integrityAlerts || 0), icon: AlertTriangle, color: 'red', trend: s.integrityAlerts > 0 ? 'Requires attention' : 'All clear', up: s.integrityAlerts === 0 },
         ])

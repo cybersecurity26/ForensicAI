@@ -610,7 +610,7 @@ POST /api/auth/login
 
 | Feature | Description |
 |---|---|
-| **Investigation Stats** | Active cases, evidence files, reports generated, integrity alerts |
+| **Investigation Stats** | Active cases, evidence files, threat indicators, critical threat flags, reports generated, integrity alerts |
 | **Case Activity Chart** | Line chart showing case + report creation over time |
 | **Evidence Distribution** | Donut chart of evidence file types |
 | **Quick Access** | Recent cases with status badges |
@@ -664,7 +664,7 @@ POST /api/auth/login
 |---|---|
 | **Profile Tab** | Name, email, role, organization — editable |
 | **Security Tab** | Password change, 2FA toggle, session timeout, passkey management |
-| **AI Engine Tab** | Provider, model, API key, temperature, max tokens, tone configuration |
+| **AI Engine Tab** | Provider, model, API key, temperature, max tokens, tone configuration, AbuseIPDB and VirusTotal API keys, threat severity threshold, and RAG context limit |
 | **Notifications Tab** | Toggle alerts for cases, evidence, AI reports, security, maintenance |
 | **Passkey Management** | Add/remove WebAuthn passkeys with registration date display |
 

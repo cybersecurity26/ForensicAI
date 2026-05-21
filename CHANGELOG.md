@@ -23,6 +23,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Evidence Citation Cards**: Detailed references showing the originating log line, timestamp, severity, mapped MITRE technique, and threat intelligence scores with interactive popups.
 
 #### Platform Improvements
+- **Expanded Dashboard Stats**: Integrated real-time counts of detected Threat Indicators (IOCs) and Critical Threat Flags directly on the main dashboard stats grid.
+- **AI & Threat Intel Settings**: Expanded settings tab to allow dynamic key management for AbuseIPDB and VirusTotal, custom threat severity threshold adjustments, and RAG context limit configuration.
+- **Compacted Legal Policies**: Re-synchronized and compacted Privacy, Terms, and Cookies policies in Legal.jsx to accurately reflect third-party Threat Intel integrations and LLM data handling.
 - **Mobile Responsive Design**: Fully responsive navigation layout with collapsible sidebar overlay, hamburger menu, and responsive grids.
 - **CI/CD Integration**: Configured GitHub Actions workflows for continuous build testing, security auditing, and CodeQL static analysis.
 

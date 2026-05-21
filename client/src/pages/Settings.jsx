@@ -46,6 +46,10 @@ export default function Settings() {
   const [aiTone, setAiTone] = useState('neutral')
   const [aiAutoGen, setAiAutoGen] = useState(false)
   const [aiRequireApproval, setAiRequireApproval] = useState(true)
+  const [abuseIpDbApiKey, setAbuseIpDbApiKey] = useState('')
+  const [virusTotalApiKey, setVirusTotalApiKey] = useState('')
+  const [threatSeverityThreshold, setThreatSeverityThreshold] = useState(50)
+  const [ragContextLimit, setRagContextLimit] = useState(25)
 
   // Notifications state
   const [notifs, setNotifs] = useState({
@@ -72,6 +76,10 @@ export default function Settings() {
           setAiProvider(data.provider); setAiModel(data.model); setAiApiKey(data.apiKey)
           setAiTemp(data.temperature); setAiMaxTokens(data.maxTokens); setAiTone(data.tone)
           setAiAutoGen(data.autoGenerate); setAiRequireApproval(data.requireApproval)
+          setAbuseIpDbApiKey(data.abuseIpDbApiKey || '')
+          setVirusTotalApiKey(data.virusTotalApiKey || '')
+          setThreatSeverityThreshold(data.threatSeverityThreshold ?? 50)
+          setRagContextLimit(data.ragContextLimit ?? 25)
         } else if (activeTab === 'notifications') {
           const data = await getNotificationSettings()
           setNotifs(data)
@@ -119,8 +127,12 @@ export default function Settings() {
         provider: aiProvider, model: aiModel, apiKey: aiApiKey || undefined,
         temperature: aiTemp, maxTokens: aiMaxTokens, tone: aiTone,
         autoGenerate: aiAutoGen, requireApproval: aiRequireApproval,
+        abuseIpDbApiKey: abuseIpDbApiKey || undefined,
+        virusTotalApiKey: virusTotalApiKey || undefined,
+        threatSeverityThreshold,
+        ragContextLimit,
       })
-      showToast('AI configuration saved')
+      showToast('AI & Threat configuration saved')
     } catch (err) { showToast('Error: ' + err.message) }
     setSaving(false)
   }
@@ -160,7 +172,7 @@ export default function Settings() {
         {[
           { key: 'profile', icon: User, label: 'Profile' },
           { key: 'security', icon: Shield, label: 'Security' },
-          { key: 'ai', icon: Brain, label: 'AI Engine' },
+          { key: 'ai', icon: Brain, label: 'AI & Threat Intel' },
           { key: 'notifications', icon: Bell, label: 'Notifications' },
         ].map(tab => {
           const Icon = tab.icon
@@ -458,9 +470,50 @@ export default function Settings() {
                     </div>
                   </div>
 
+                  <div className="settings-group">
+                    <div className="settings-group-title">Threat Intelligence Feeds</div>
+                    <div className="settings-group-desc">Configure API credentials and parameters for IP/file reputation feeds and dynamic log correlation.</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">AbuseIPDB API Key</label>
+                        <input className="form-input" type="password" placeholder="Enter API key..."
+                          value={abuseIpDbApiKey} onChange={e => setAbuseIpDbApiKey(e.target.value)} />
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                          Leave blank to keep existing. Currently: {abuseIpDbApiKey || 'not set'}
+                        </div>
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">VirusTotal API Key</label>
+                        <input className="form-input" type="password" placeholder="Enter API key..."
+                          value={virusTotalApiKey} onChange={e => setVirusTotalApiKey(e.target.value)} />
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                          Leave blank to keep existing. Currently: {virusTotalApiKey || 'not set'}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 12 }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Threat Severity Threshold (%)</label>
+                        <input className="form-input" type="number" min="0" max="100"
+                          value={threatSeverityThreshold} onChange={e => setThreatSeverityThreshold(parseInt(e.target.value) || 0)} />
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                          Confidence score threshold for flagging indicators as critical
+                        </div>
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">RAG Chat Context Log Limit</label>
+                        <input className="form-input" type="number" min="5" max="100"
+                          value={ragContextLimit} onChange={e => setRagContextLimit(parseInt(e.target.value) || 0)} />
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                          Maximum parsed events sent to LLM during interactive case chat queries
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                     <button className="btn btn-primary" onClick={handleSaveAi} disabled={saving}>
-                      {saving ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Brain size={15} />} Save AI Config
+                      {saving ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Brain size={15} />} Save Settings
                     </button>
                   </div>
                 </div>

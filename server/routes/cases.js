@@ -2,6 +2,7 @@ import express from 'express'
 import { body, validationResult, param } from 'express-validator'
 import Case from '../models/Case.js'
 import Evidence from '../models/Evidence.js'
+import User from '../models/User.js'
 import { generateChatResponse } from '../services/aiService.js'
 import { optionalAuth } from '../middleware/auth.js'
 import { logAudit } from '../middleware/audit.js'
@@ -180,11 +181,22 @@ router.post('/:id/chat', optionalAuth, async (req, res, next) => {
 
     let matchedEvents = []
 
+    // Get dynamic RAG context limit from user settings
+    let ragContextLimit = 25
+    try {
+      const user = await User.findOne()
+      if (user && user.settings.ragContextLimit) {
+        ragContextLimit = user.settings.ragContextLimit
+      }
+    } catch (err) {
+      console.error('Error loading RAG context limit:', err.message)
+    }
+
     if (keywords.length === 0) {
-      // Return top 25 chronologically or severity sorted events if no query keywords
+      // Return top events chronologically or severity sorted events if no query keywords
       matchedEvents = allEvents
         .sort((a, b) => (b.severity === 'critical' || b.severity === 'danger' ? 1 : -1))
-        .slice(0, 25)
+        .slice(0, ragContextLimit)
     } else {
       // Score each event based on keyword matches
       const scored = allEvents.map(event => {
@@ -216,7 +228,7 @@ router.post('/:id/chat', optionalAuth, async (req, res, next) => {
         .filter(item => item.score > 0)
         .sort((a, b) => b.score - a.score)
         .map(item => item.event)
-        .slice(0, 25)
+        .slice(0, ragContextLimit)
     }
 
     // 3. Call AI Service to generate response

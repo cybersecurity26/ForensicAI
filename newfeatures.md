@@ -104,4 +104,45 @@ VIRUSTOTAL_API_KEY=your_virustotal_key
 
 ---
 
+---
+
+## 6. Configurable AI & Threat Intel Settings
+
+### Use & Description
+Investigators can now manage key platform configurations directly from the **AI & Threat Intel** tab in the Settings page:
+- **API Key Management**: Securely configure and update API keys for OpenAI, Gemini, Mistral, AbuseIPDB, and VirusTotal. Input values are masked on load to protect secrets.
+- **Threat Severity Threshold**: A slider/input (0–100) that allows administrators to define the minimum risk score required to flag an IP or file hash as malicious.
+- **RAG Context Limit**: Configures the maximum number of logs (5–100) retrieved as context for the RAG chatbot query, optimizing performance and API token usage.
+
+### Purpose & Why We Added It
+- **Zero-Code Customization**: Enables security teams to update API keys and tuning parameters without modifying environment variables or restarting the backend server.
+- **Tuning and Optimization**: Allows teams to adjust response context limits to balance API costs and explanation details, and adjust threat scoring sensitivity based on their organization's risk tolerance.
+
+---
+
+## 7. Real-Time Dashboard Statistics
+
+### Use & Description
+The investigation dashboard has been enhanced with two new indicators:
+- **Threat Indicators**: Displays the count of unique Indicators of Compromise (IPs and file hashes) parsed across all evidence files.
+- **Critical Threat Flags**: Shows the total count of severe threats (threat reputation score >= 90) needing immediate investigator review.
+
+### Purpose & Why We Added It
+- **At-a-Glance Triage**: Gives incident response managers an immediate understanding of threat volume and critical alarms without needing to open individual cases or navigate to the threat indicators tab.
+
+---
+
+## 8. Compacted Legal Policies
+
+### Use & Description
+The platform's legal policies (`Privacy Policy`, `Terms of Use`, and `Cookies Policy`) have been streamlined and updated:
+- **Data Integrations Transparency**: Added disclosures detailing how logs containing IP addresses or file hashes are forwarded to AbuseIPDB, VirusTotal, and LLM providers (Mistral, Google, OpenAI) for analysis.
+- **Compact Layout**: Formatted policy pages with clear collapsible/compact sections for readability and rapid compliance reviews.
+
+### Purpose & Why We Added It
+- **Regulatory Compliance**: Ensures transparency in client data transmission, explaining why external services receive forensic identifiers and how chain-of-custody privacy is preserved.
+
+---
+
 *ForensicAI v1.0.2 — Internal Release Briefing Document*
+

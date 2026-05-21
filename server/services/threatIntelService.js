@@ -1,3 +1,5 @@
+import User from '../models/User.js'
+
 // Known malicious IPs/hashes for realistic local simulation
 const KNOWN_THREATS = {
   // Tor Exit Nodes
@@ -57,7 +59,15 @@ export async function getIpReputation(ip) {
     return KNOWN_THREATS[ip]
   }
 
-  const apiKey = process.env.ABUSEIPDB_API_KEY
+  let apiKey = process.env.ABUSEIPDB_API_KEY
+  try {
+    const user = await User.findOne()
+    if (user && user.settings.abuseIpDbApiKey) {
+      apiKey = user.settings.abuseIpDbApiKey
+    }
+  } catch (err) {
+    console.error('Error loading AbuseIPDB API key:', err.message)
+  }
 
   // If API key is set, query real AbuseIPDB API
   if (apiKey && apiKey !== 'your_api_key_here') {
@@ -118,7 +128,15 @@ export async function getHashReputation(hash) {
     return KNOWN_THREATS[cleanHash]
   }
 
-  const apiKey = process.env.VIRUSTOTAL_API_KEY
+  let apiKey = process.env.VIRUSTOTAL_API_KEY
+  try {
+    const user = await User.findOne()
+    if (user && user.settings.virusTotalApiKey) {
+      apiKey = user.settings.virusTotalApiKey
+    }
+  } catch (err) {
+    console.error('Error loading VirusTotal API key:', err.message)
+  }
 
   if (apiKey && apiKey !== 'your_api_key_here') {
     try {
