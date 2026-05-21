@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
-  User, Shield, Bell, Brain, Key, Database,
-  Save, Eye, Lock, Globe, Monitor, Palette, Loader, CheckCircle
+  User, Shield, Bell, Brain, Key,
+  Save, Lock, Loader, CheckCircle, Database
 } from 'lucide-react'
 import {
   getProfile, updateProfile,
@@ -11,11 +11,16 @@ import {
   getAiSettings, updateAiSettings,
   getNotificationSettings, updateNotificationSettings,
   getPasskeyRegisterOptions, registerPasskey, getPasskeys, deletePasskey,
+  migrateOwnership,
 } from '../api'
 import { startRegistration } from '@simplewebauthn/browser'
+import { useAuth } from '../context/AuthContext'
 
 export default function Settings() {
+  const { updateUser, user: authUser } = useAuth()
+  const isAdmin = authUser?.role === 'admin'
   const [activeTab, setActiveTab] = useState('profile')
+  const [migrating, setMigrating] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
@@ -93,7 +98,14 @@ export default function Settings() {
   const handleSaveProfile = async () => {
     setSaving(true)
     try {
-      await updateProfile({ name, email, role, organization })
+      const res = await updateProfile({ name, email, role, organization })
+      // Update global auth state so Header & dropdown reflect changes immediately
+      if (res) {
+        updateUser(
+          { name: res.name, email: res.email, role: res.role, organization: res.organization },
+          res.token // new JWT if backend issues one on profile change
+        )
+      }
       showToast('Profile saved successfully')
     } catch (err) { showToast('Error: ' + err.message) }
     setSaving(false)
@@ -242,6 +254,42 @@ export default function Settings() {
                       {saving ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={15} />} Save Changes
                     </button>
                   </div>
+
+                  {/* Admin-only: Case Ownership Migration */}
+                  {isAdmin && (
+                    <div style={{
+                      marginTop: 20, padding: '16px 20px',
+                      background: 'rgba(255,171,64,0.06)', border: '1px solid rgba(255,171,64,0.15)',
+                      borderRadius: 'var(--radius-sm)',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Database size={15} style={{ color: '#ffab40' }} />
+                            Migrate Case Ownership
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 3 }}>
+                            Assign ownership to legacy cases based on their assignee. Run this once after enabling access controls.
+                          </div>
+                        </div>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          disabled={migrating}
+                          onClick={async () => {
+                            setMigrating(true)
+                            try {
+                              const res = await migrateOwnership()
+                              showToast(`✅ ${res.message}`)
+                            } catch (err) { showToast('Error: ' + err.message) }
+                            setMigrating(false)
+                          }}
+                        >
+                          {migrating ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Database size={14} />}
+                          {migrating ? ' Migrating...' : ' Run Migration'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>

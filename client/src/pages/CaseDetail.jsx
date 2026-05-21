@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FileText, Upload, Clock, Shield, Hash,
   Download, Eye, Trash2, CheckCircle, AlertTriangle,
   Brain, Edit3, Save, X, Loader, User, RefreshCw,
-  MessageSquare, Send, Globe, Database
+  MessageSquare, Send, Globe, Database, Share2, UserPlus, UserMinus, Lock
 } from 'lucide-react'
-import { getCase, updateCase, getTimeline, getReports, getAuditLogs, generateReport, parseAllEvidence, sendCaseChatMessage, getHealthStatus } from '../api'
+import { getCase, updateCase, getTimeline, getReports, getAuditLogs, generateReport, parseAllEvidence, sendCaseChatMessage, getHealthStatus, shareCase, revokeCaseShare } from '../api'
+import { useAuth } from '../context/AuthContext'
 
 export function renderMarkdown(text) {
   if (!text) return ''
@@ -178,6 +179,8 @@ export function renderMarkdown(text) {
 export default function CaseDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const isViewer = user?.role === 'viewer'
   const [activeTab, setActiveTab] = useState('evidence')
   const [loading, setLoading] = useState(true)
   const [caseData, setCaseData] = useState(null)
@@ -190,6 +193,12 @@ export default function CaseDetail() {
   const [analyzing, setAnalyzing] = useState(false)
   const [reparsing, setReparsing] = useState(false)
   const [toast, setToast] = useState('')
+
+  // Share modal state
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [shareEmail, setShareEmail] = useState('')
+  const [shareLoading, setShareLoading] = useState(false)
+  const [sharedWith, setSharedWith] = useState([])
 
   // Case Chatbot State (RAG)
   const [chatMessages, setChatMessages] = useState([])
@@ -280,6 +289,7 @@ export default function CaseDetail() {
         const c = await getCase(id)
         setCaseData(c)
         setEvidence(c.evidence || [])
+        setSharedWith(c.sharedWith || [])
         setEditTitle(c.title)
         setEditDesc(c.description || '')
         setEditStatus(c.status)
@@ -358,6 +368,42 @@ export default function CaseDetail() {
     setReparsing(false)
   }
 
+  // Determine if current user is owner or admin (may share the case)
+  const isOwner = user?.role === 'admin' ||
+    !caseData?.createdBy ||
+    (caseData?.createdBy && (
+      caseData.createdBy === user?.id ||
+      caseData.createdBy?._id === user?.id ||
+      caseData.createdBy?.toString?.() === user?.id
+    ))
+
+  const handleShare = async (e) => {
+    e.preventDefault()
+    if (!shareEmail.trim()) return
+    setShareLoading(true)
+    try {
+      const res = await shareCase(id, shareEmail.trim())
+      setSharedWith(res.sharedWith || [])
+      setShareEmail('')
+      showToast(`✅ Case shared with ${shareEmail.trim()}`)
+    } catch (err) {
+      showToast('Error: ' + err.message)
+    }
+    setShareLoading(false)
+  }
+
+  const handleRevokeShare = async (userId) => {
+    setShareLoading(true)
+    try {
+      const res = await revokeCaseShare(id, userId)
+      setSharedWith(res.sharedWith || [])
+      showToast('Access revoked')
+    } catch (err) {
+      showToast('Error: ' + err.message)
+    }
+    setShareLoading(false)
+  }
+
   const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'
   const formatDateTime = (d) => d ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
   const formatFileSize = (bytes) => {
@@ -392,6 +438,7 @@ export default function CaseDetail() {
   }
 
   return (
+    <>
     <motion.div className="page-enter" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
       {/* Toast */}
       {toast && (
@@ -479,19 +526,49 @@ export default function CaseDetail() {
             </>
           ) : (
             <>
-              <button className="btn btn-secondary" onClick={() => setEditing(true)}><Edit3 size={15} /> Edit</button>
+              {/* Viewer badge */}
+              {isViewer && (
+                <span style={{
+                  display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.78rem', fontWeight: 600,
+                  color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-sm)', padding: '4px 10px',
+                }}>
+                  <Lock size={12} /> View Only
+                </span>
+              )}
+              {/* Share button — owner/admin only */}
+              {isOwner && !isViewer && (
+                <button className="btn btn-secondary" onClick={() => setShowShareModal(true)}>
+                  <Share2 size={15} /> Share
+                  {sharedWith.length > 0 && (
+                    <span style={{
+                      marginLeft: 4, background: 'var(--accent-primary)', color: '#000',
+                      borderRadius: '50%', width: 16, height: 16, fontSize: '0.65rem',
+                      fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    }}>{sharedWith.length}</span>
+                  )}
+                </button>
+              )}
+              {/* Edit — hidden for viewers */}
+              {!isViewer && (
+                <button className="btn btn-secondary" onClick={() => setEditing(true)}><Edit3 size={15} /> Edit</button>
+              )}
               {reports.length > 0 && (
                 <Link to={`/reports/${reports[0]._id}`} className="btn btn-secondary">
                   <FileText size={15} /> View Report
                 </Link>
               )}
-              <button className="btn btn-primary" onClick={handleAiAnalyze} disabled={analyzing}>
-                {analyzing ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Brain size={15} />} AI Analyze
-              </button>
+              {/* AI Analyze — hidden for viewers */}
+              {!isViewer && (
+                <button className="btn btn-primary" onClick={handleAiAnalyze} disabled={analyzing}>
+                  {analyzing ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Brain size={15} />} AI Analyze
+                </button>
+              )}
             </>
           )}
         </div>
       </div>
+
 
       {/* Stats Row */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 24 }}>
@@ -540,21 +617,24 @@ export default function CaseDetail() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <div className="section-header">
             <div className="section-title">Evidence Files ({evidence.length})</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={handleReparse}
-                disabled={reparsing}
-                title="Re-parse all evidence files to extract timeline events"
-              >
-                {reparsing
-                  ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                  : <RefreshCw size={14} />}
-                {reparsing ? 'Re-parsing...' : 'Re-parse All'}
-              </button>
-              <Link to="/evidence" className="btn btn-primary btn-sm"><Upload size={14} /> Upload Evidence</Link>
-            </div>
+            {!isViewer && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleReparse}
+                  disabled={reparsing}
+                  title="Re-parse all evidence files to extract timeline events"
+                >
+                  {reparsing
+                    ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                    : <RefreshCw size={14} />}
+                  {reparsing ? 'Re-parsing...' : 'Re-parse All'}
+                </button>
+                <Link to="/evidence" className="btn btn-primary btn-sm"><Upload size={14} /> Upload Evidence</Link>
+              </div>
+            )}
           </div>
+
           {evidence.length === 0 ? (
             <div className="empty-state" style={{ padding: '40px 20px' }}>
               <div className="empty-state-icon"><Upload size={32} /></div>
@@ -1109,5 +1189,163 @@ export default function CaseDetail() {
         </motion.div>
       )}
     </motion.div>
+
+      {/* ─── Share Case Modal ─── */}
+      <AnimatePresence>
+        {showShareModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 9000,
+              background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            onClick={(e) => { if (e.target === e.currentTarget) setShowShareModal(false) }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              style={{
+                width: 480, background: 'var(--bg-card)',
+                border: '1px solid var(--border-primary)',
+                borderRadius: 'var(--radius-lg)',
+                boxShadow: '0 24px 64px rgba(0,0,0,0.7)',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Header */}
+              <div style={{
+                padding: '20px 24px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                borderBottom: '1px solid var(--border-primary)',
+                background: 'linear-gradient(135deg, rgba(0,212,255,0.05), rgba(123,97,255,0.05))',
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 700, fontSize: '1.05rem' }}>
+                    <Share2 size={18} style={{ color: 'var(--accent-primary)' }} />
+                    Share Case
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 3 }}>
+                    {caseData?.caseNumber} — {caseData?.title}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Add user */}
+              <div style={{ padding: '20px 24px' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 10 }}>
+                  Invite by email address
+                </div>
+                <form onSubmit={handleShare} style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    className="form-input"
+                    type="email"
+                    placeholder="investigator@example.com"
+                    value={shareEmail}
+                    onChange={e => setShareEmail(e.target.value)}
+                    style={{ flex: 1 }}
+                    disabled={shareLoading}
+                  />
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-sm"
+                    disabled={shareLoading || !shareEmail.trim()}
+                    style={{ flexShrink: 0 }}
+                  >
+                    {shareLoading ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <UserPlus size={14} />}
+                    {shareLoading ? '' : ' Add'}
+                  </button>
+                </form>
+              </div>
+
+              {/* Current shared users */}
+              <div style={{ padding: '0 24px 20px' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 10 }}>
+                  Currently shared with ({sharedWith.length})
+                </div>
+                {sharedWith.length === 0 ? (
+                  <div style={{
+                    padding: '16px', textAlign: 'center', color: 'var(--text-muted)',
+                    fontSize: '0.83rem', borderRadius: 'var(--radius-sm)',
+                    background: 'var(--bg-elevated)', border: '1px dashed var(--border-subtle)',
+                  }}>
+                    This case is not shared with anyone yet.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {sharedWith.map((u) => {
+                      const uid = u._id || u
+                      const uName = u.name || 'Unknown'
+                      const uEmail = u.email || ''
+                      const uRole = u.role || 'investigator'
+                      return (
+                        <div
+                          key={uid}
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '10px 14px', borderRadius: 'var(--radius-sm)',
+                            background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{
+                              width: 34, height: 34, borderRadius: '50%',
+                              background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: '0.75rem', fontWeight: 800, color: '#fff', flexShrink: 0,
+                            }}>
+                              {uName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{uName}</div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{uEmail}</div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{
+                              fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
+                              padding: '2px 8px', borderRadius: 4,
+                              background: uRole === 'admin' ? 'rgba(255,107,107,0.15)' : 'rgba(0,212,255,0.1)',
+                              color: uRole === 'admin' ? '#ff6b6b' : 'var(--accent-primary)',
+                              border: `1px solid ${uRole === 'admin' ? 'rgba(255,107,107,0.3)' : 'rgba(0,212,255,0.2)'}`,
+                            }}>
+                              {uRole}
+                            </span>
+                            <button
+                              onClick={() => handleRevokeShare(uid)}
+                              disabled={shareLoading}
+                              title="Revoke access"
+                              style={{
+                                background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.2)',
+                                borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
+                                color: '#ff6b6b', display: 'flex', alignItems: 'center', gap: 4,
+                                fontSize: '0.75rem', fontWeight: 600, transition: 'all 0.15s',
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,107,107,0.2)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,107,107,0.1)'}
+                            >
+                              <UserMinus size={13} /> Revoke
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   )
 }

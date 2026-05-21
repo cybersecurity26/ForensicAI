@@ -6,6 +6,7 @@ const auditLogSchema = new mongoose.Schema({
     required: true,
     enum: [
       'case_created', 'case_updated', 'case_closed',
+      'case_shared', 'case_share_revoked',
       'evidence_uploaded', 'evidence_parsed', 'evidence_verified',
       'evidence_hash_check', 'evidence_deleted',
       'report_generated', 'report_edited', 'report_reviewed',
@@ -13,6 +14,7 @@ const auditLogSchema = new mongoose.Schema({
       'ai_summary_generated', 'ai_findings_generated', 'ai_section_generated',
       'user_login', 'user_login_2fa', 'user_logout', 'user_created',
       'settings_changed', 'security_updated',
+      'migration_run',
     ],
   },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

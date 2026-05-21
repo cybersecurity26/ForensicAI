@@ -1,8 +1,10 @@
 import express from 'express'
+import mongoose from 'mongoose'
 import PDFDocument from 'pdfkit'
 import Report from '../models/Report.js'
 import Case from '../models/Case.js'
 import Evidence from '../models/Evidence.js'
+import User from '../models/User.js'
 import { generateSummary, generateFindings, generateReportSection } from '../services/aiService.js'
 import { buildTimeline } from '../utils/parser.js'
 import { optionalAuth } from '../middleware/auth.js'
@@ -10,13 +12,63 @@ import { logAudit } from '../middleware/audit.js'
 
 const router = express.Router()
 
-// GET /api/reports — List all reports
+// ─── Access helpers ────────────────────────────────────────────────────────────
+function toId(val) {
+  if (!val) return null
+  if (val._id) return val._id.toString()
+  return val.toString()
+}
+
+async function getReqUser(req) {
+  if (req.user && req.user.id) return req.user
+  const dbUser = await User.findOne().lean()
+  if (dbUser) return { id: dbUser._id.toString(), role: dbUser.role }
+  return null
+}
+
+function canAccessCase(caseDoc, userId, role) {
+  if (role === 'admin') return true
+  const creatorId = toId(caseDoc.createdBy)
+  if (!creatorId) return false
+  if (creatorId === userId.toString()) return true
+  return (caseDoc.sharedWith || []).some(entry => toId(entry) === userId.toString())
+}
+
+async function getAccessibleCaseIds(userId, role) {
+  if (role === 'admin') {
+    const all = await Case.find({}, '_id').lean()
+    return all.map(c => c._id)
+  }
+  let uid
+  try { uid = new mongoose.Types.ObjectId(userId) } catch { uid = userId }
+  const cases = await Case.find({
+    $or: [{ createdBy: uid }, { sharedWith: uid }],
+  }, '_id').lean()
+  return cases.map(c => c._id)
+}
+
+// GET /api/reports — List reports for cases accessible to current user
 router.get('/', optionalAuth, async (req, res, next) => {
   try {
+    const reqUser = await getReqUser(req)
     const { status, caseId, page = 1, limit = 20 } = req.query
     const filter = {}
     if (status && status !== 'all') filter.status = status
-    if (caseId) filter.caseId = caseId
+
+    if (caseId) {
+      // If specific caseId requested, verify access first
+      if (reqUser) {
+        const caseDoc = await Case.findById(caseId)
+        if (caseDoc && !canAccessCase(caseDoc, reqUser.id, reqUser.role)) {
+          return res.status(403).json({ error: 'Access denied to this case' })
+        }
+      }
+      filter.caseId = caseId
+    } else if (reqUser) {
+      // Scope to accessible cases
+      const accessibleIds = await getAccessibleCaseIds(reqUser.id, reqUser.role)
+      filter.caseId = { $in: accessibleIds }
+    }
 
     const skip = (parseInt(page) - 1) * parseInt(limit)
     const total = await Report.countDocuments(filter)
@@ -32,25 +84,43 @@ router.get('/', optionalAuth, async (req, res, next) => {
   }
 })
 
-// GET /api/reports/:id — Get report detail
+// GET /api/reports/:id — Get report detail (access-checked)
 router.get('/:id', optionalAuth, async (req, res, next) => {
   try {
+    const reqUser = await getReqUser(req)
     const report = await Report.findById(req.params.id).populate('caseId')
     if (!report) return res.status(404).json({ error: 'Report not found' })
+
+    if (reqUser && report.caseId) {
+      if (!canAccessCase(report.caseId, reqUser.id, reqUser.role)) {
+        return res.status(403).json({ error: 'Access denied to this report' })
+      }
+    }
+
     res.json(report)
   } catch (err) {
     next(err)
   }
 })
 
-// POST /api/reports/generate — Generate report with AI assistance
+// POST /api/reports/generate — Generate report with AI assistance (viewers blocked)
 router.post('/generate', optionalAuth, async (req, res, next) => {
   try {
+    const reqUser = await getReqUser(req)
+    if (reqUser && reqUser.role === 'viewer') {
+      return res.status(403).json({ error: 'Viewers cannot generate reports' })
+    }
+
     const { caseId } = req.body
     if (!caseId) return res.status(400).json({ error: 'caseId is required' })
 
     const caseDoc = await Case.findById(caseId)
     if (!caseDoc) return res.status(404).json({ error: 'Case not found' })
+
+    // Check case access
+    if (reqUser && !canAccessCase(caseDoc, reqUser.id, reqUser.role)) {
+      return res.status(403).json({ error: 'Access denied to this case' })
+    }
 
     // Gather evidence — use .lean() to get plain JS objects (avoids Mongoose subdoc spread issues)
     const evidenceList = await Evidence.find({ caseId, status: { $in: ['verified', 'parsed'] } }).lean()
@@ -205,12 +275,22 @@ ${mitreRows}`
   }
 })
 
-// PUT /api/reports/:id — Edit report (human review)
+// PUT /api/reports/:id — Edit report (viewers blocked)
 router.put('/:id', optionalAuth, async (req, res, next) => {
   try {
+    const reqUser = await getReqUser(req)
+    if (reqUser && reqUser.role === 'viewer') {
+      return res.status(403).json({ error: 'Viewers cannot edit reports' })
+    }
+
     const { sections, status, title } = req.body
-    const report = await Report.findById(req.params.id)
+    const report = await Report.findById(req.params.id).populate('caseId')
     if (!report) return res.status(404).json({ error: 'Report not found' })
+
+    // Check case access
+    if (reqUser && report.caseId && !canAccessCase(report.caseId, reqUser.id, reqUser.role)) {
+      return res.status(403).json({ error: 'Access denied to this report' })
+    }
 
     if (title) report.title = title
     if (status) report.status = status

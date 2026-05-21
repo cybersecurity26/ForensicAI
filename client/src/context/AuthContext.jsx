@@ -71,8 +71,21 @@ export function AuthProvider({ children }) {
     }
   }, [isAuthenticated, resetTimer])
 
+  // Update User profile details in state and localStorage
+  const updateUser = useCallback((userData, newToken) => {
+    setUser(prev => {
+      const newUser = { ...prev, ...userData }
+      localStorage.setItem('forensic_user', JSON.stringify(newUser))
+      return newUser
+    })
+    if (newToken) {
+      setToken(newToken)
+      localStorage.setItem('forensic_token', newToken)
+    }
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout, sessionTimeout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout, sessionTimeout, updateUser }}>
       {children}
     </AuthContext.Provider>
   )

@@ -6,6 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [1.1.0] — 2026-05-21
+
+### Added
+
+#### Case Ownership & Access Control
+- **Case Ownership Model**: Every case now tracks `createdBy` (owner) and `sharedWith` (collaborators) fields — non-admin users only see cases they own or were shared with.
+- **Ownership-Based Filtering**: All backend routes (`cases`, `evidence`, `reports`, `timeline`, `dashboard`, `audit`) enforce access control through `buildAccessFilter`, `canAccessCase`, and `getAccessibleCaseIds` helpers.
+- **Viewer Role Restrictions**: Viewers can browse accessible cases and use the forensic chat, but cannot create/edit/delete cases, upload/parse evidence, or generate/edit reports.
+- **Admin Override**: Admins retain full visibility and management access across all cases and features.
+
+#### Case Sharing & Collaboration
+- **Share Case (POST `/cases/:id/share`)**: Case owners and admins can share a case with another user by email. Shared users gain read access to the case, its evidence, reports, and timeline.
+- **Revoke Access (DELETE `/cases/:id/share/:userId`)**: Case owners and admins can revoke access from a shared user at any time.
+- **Share Case Modal**: Premium animated modal on Case Detail page with email invite form, shared user list with avatars and role badges, and per-user revoke buttons.
+- **ObjectId Type Safety**: All access checks now properly convert string user IDs to MongoDB ObjectIds for reliable matching, and handle both populated and unpopulated Mongoose document fields.
+
+#### User-Scoped Notifications & Activity
+- **Scoped Notifications**: The notifications bell now only shows actions performed by the logged-in user — no cross-user notification leakage.
+- **Scoped Activity Feed**: The dashboard activity feed now only shows the logged-in user's own actions.
+
+#### Profile & Settings
+- **Instant Profile Sync**: `updateUser` in AuthContext updates profile and token state immediately upon settings changes — Header reflects name/role changes without re-login.
+- **Auto Assignee Name**: New cases automatically set `assigneeName` to the logged-in user's full name (no more hardcoded dropdown).
+- **Admin Migration Tool**: Settings → Profile includes a one-click "Migrate Case Ownership" button (admin-only) that backfills `createdBy` from assignee data on legacy cases and fixes shortened assignee names to full names.
+
+### Fixed
+- **Revoke Not Working**: `$pull` operation now converts userId to ObjectId before removing from `sharedWith` — previously silently failed due to string-vs-ObjectId mismatch.
+- **Shared Cases Invisible**: Access checks now use a `toId()` helper that handles populated Mongoose documents (where `.sharedWith` entries are full user objects with `._id`) and raw ObjectIds equally.
+- **Fallback Cases Removed**: Case Management page no longer falls back to hardcoded demo cases when the API returns an empty list.
+- **Missing Audit Actions**: Added `case_shared`, `case_share_revoked`, and `migration_run` to the AuditLog schema enum — these were previously causing silent Mongoose validation failures.
+
+### Changed
+- **Case Creation**: Removed hardcoded assignee dropdown ("Vinay T.", "Sarah L.", "Henry F.") — replaced with a read-only field showing the logged-in user's name.
+- **Legacy Case Visibility**: Cases with `createdBy: null` are now only visible to admins (previously visible to all authenticated users).
+
+---
+
 ## [1.0.2] — 2026-05-21
 
 ### Added
@@ -90,5 +127,6 @@ The first stable release of ForensicAI — an AI-powered digital forensics inves
 
 ---
 
+[1.1.0]: https://github.com/cybersecurity26/ForensicAI/releases/tag/v1.1.0
 [1.0.2]: https://github.com/cybersecurity26/ForensicAI/releases/tag/v1.0.2
 [1.0.0]: https://github.com/cybersecurity26/ForensicAI/releases/tag/v1.0.0

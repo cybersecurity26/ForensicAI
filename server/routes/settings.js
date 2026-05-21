@@ -1,5 +1,6 @@
 import express from 'express'
 import bcrypt from 'bcryptjs'
+import jwt from 'jsonwebtoken'
 import User from '../models/User.js'
 import { optionalAuth } from '../middleware/auth.js'
 import { logAudit } from '../middleware/audit.js'
@@ -57,11 +58,22 @@ router.put('/profile', optionalAuth, async (req, res, next) => {
     await user.save()
     await logAudit('profile_updated', 'user', user._id, `Profile updated for ${user.name}`, req)
 
+    // Re-issue JWT so the client immediately reflects the new name/role without re-login
+    let newToken
+    try {
+      newToken = jwt.sign(
+        { id: user._id, name: user.name, email: user.email, role: user.role },
+        process.env.JWT_SECRET,
+        { expiresIn: '24h' }
+      )
+    } catch (e) { /* JWT_SECRET not set — single-user mode fallback */ }
+
     res.json({
       name: user.name,
       email: user.email,
       role: user.role,
       organization: user.organization,
+      ...(newToken ? { token: newToken } : {}),
     })
   } catch (err) {
     next(err)

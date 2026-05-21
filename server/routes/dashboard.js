@@ -1,32 +1,61 @@
 import express from 'express'
+import mongoose from 'mongoose'
 import Case from '../models/Case.js'
 import Evidence from '../models/Evidence.js'
 import Report from '../models/Report.js'
 import AuditLog from '../models/AuditLog.js'
+import User from '../models/User.js'
 import { optionalAuth } from '../middleware/auth.js'
 
 const router = express.Router()
 
-// GET /api/dashboard/stats — aggregated dashboard statistics
+// ─── Access helpers ──────────────────────────────────────────────────────
+async function getReqUser(req) {
+  if (req.user && req.user.id) return req.user
+  const dbUser = await User.findOne().lean()
+  if (dbUser) return { id: dbUser._id.toString(), role: dbUser.role }
+  return null
+}
+
+async function getAccessibleCaseIds(userId, role) {
+  if (role === 'admin') {
+    const all = await Case.find({}, '_id').lean()
+    return all.map(c => c._id)
+  }
+  let uid
+  try { uid = new mongoose.Types.ObjectId(userId) } catch { uid = userId }
+  const cases = await Case.find({
+    $or: [{ createdBy: uid }, { sharedWith: uid }],
+  }, '_id').lean()
+  return cases.map(c => c._id)
+}
+
+// GET /api/dashboard/stats — aggregated dashboard statistics (scoped to accessible cases)
 router.get('/stats', optionalAuth, async (req, res, next) => {
   try {
+    const reqUser = await getReqUser(req)
+    const accessibleIds = reqUser ? await getAccessibleCaseIds(reqUser.id, reqUser.role) : []
+    const caseFilter = reqUser ? { _id: { $in: accessibleIds } } : {}
+    const evidFilter = reqUser ? { caseId: { $in: accessibleIds } } : {}
+    const reportFilter = reqUser ? { caseId: { $in: accessibleIds } } : {}
+
     const [totalCases, activeCases, reviewCases, closedCases, draftCases] = await Promise.all([
-      Case.countDocuments(),
-      Case.countDocuments({ status: 'active' }),
-      Case.countDocuments({ status: 'review' }),
-      Case.countDocuments({ status: 'closed' }),
-      Case.countDocuments({ status: 'draft' }),
+      Case.countDocuments(caseFilter),
+      Case.countDocuments({ ...caseFilter, status: 'active' }),
+      Case.countDocuments({ ...caseFilter, status: 'review' }),
+      Case.countDocuments({ ...caseFilter, status: 'closed' }),
+      Case.countDocuments({ ...caseFilter, status: 'draft' }),
     ])
 
     const [totalEvidence, totalReports, draftReports, integrityAlerts] = await Promise.all([
-      Evidence.countDocuments(),
-      Report.countDocuments(),
-      Report.countDocuments({ status: 'draft' }),
-      Evidence.countDocuments({ status: 'error' }),
+      Evidence.countDocuments(evidFilter),
+      Report.countDocuments(reportFilter),
+      Report.countDocuments({ ...reportFilter, status: 'draft' }),
+      Evidence.countDocuments({ ...evidFilter, status: 'error' }),
     ])
 
-    // Calculate new feature stats (IOCs, Critical Threat Flags)
-    const evidenceList = await Evidence.find({}, 'parsedData.events').lean()
+    // IOC / Critical Threat counts (scoped to accessible evidence)
+    const evidenceList = await Evidence.find(evidFilter, 'parsedData.events').lean()
     let totalIocs = 0
     let criticalThreats = 0
     const uniqueIocs = new Set()
@@ -36,21 +65,16 @@ router.get('/stats', optionalAuth, async (req, res, next) => {
         for (const e of ev.parsedData.events) {
           if (e.threatIntel && e.threatIntel.score > 0) {
             let value = null
-            // Extract IP
             const ipMatch = e.detail?.match(/\b((?:[0-9]{1,3}\.){3}[0-9]{1,3})\b/)
             if (ipMatch) {
               value = ipMatch[1]
             } else {
               const hashMatch = e.detail?.match(/\b([a-fA-F0-9]{32})\b|\b([a-fA-F0-9]{64})\b/)
-              if (hashMatch) {
-                value = hashMatch[1] || hashMatch[2]
-              }
+              if (hashMatch) value = hashMatch[1] || hashMatch[2]
             }
             if (value) {
               uniqueIocs.add(value)
-              if (e.threatIntel.score >= 90) {
-                criticalThreats++
-              }
+              if (e.threatIntel.score >= 90) criticalThreats++
             }
           }
         }
@@ -58,20 +82,21 @@ router.get('/stats', optionalAuth, async (req, res, next) => {
     }
     totalIocs = uniqueIocs.size
 
-    // Monthly case activity for chart (last 7 months)
+    // Monthly case activity for chart (last 7 months, scoped)
     const now = new Date()
     const months = []
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
       const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59)
       const label = d.toLocaleString('default', { month: 'short' })
-      const casesCount = await Case.countDocuments({ createdAt: { $gte: d, $lte: end } })
-      const reportsCount = await Report.countDocuments({ createdAt: { $gte: d, $lte: end } })
+      const casesCount = await Case.countDocuments({ ...caseFilter, createdAt: { $gte: d, $lte: end } })
+      const reportsCount = await Report.countDocuments({ ...reportFilter, createdAt: { $gte: d, $lte: end } })
       months.push({ month: label, cases: casesCount, reports: reportsCount })
     }
 
-    // Evidence type distribution
+    // Evidence type distribution (scoped)
     const evidenceAgg = await Evidence.aggregate([
+      ...(reqUser ? [{ $match: evidFilter }] : []),
       { $group: { _id: '$metadata.fileType', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 6 },
@@ -86,17 +111,9 @@ router.get('/stats', optionalAuth, async (req, res, next) => {
 
     res.json({
       stats: {
-        activeCases,
-        totalEvidence,
-        totalReports,
-        integrityAlerts,
-        totalCases,
-        reviewCases,
-        closedCases,
-        draftCases,
-        draftReports,
-        totalIocs,
-        criticalThreats,
+        activeCases, totalEvidence, totalReports, integrityAlerts,
+        totalCases, reviewCases, closedCases, draftCases, draftReports,
+        totalIocs, criticalThreats,
       },
       caseActivity: months,
       evidenceTypes: evidenceTypes.length > 0 ? evidenceTypes : [
@@ -108,16 +125,25 @@ router.get('/stats', optionalAuth, async (req, res, next) => {
   }
 })
 
-// GET /api/dashboard/activity — recent activity feed from audit log
+// GET /api/dashboard/activity — recent activity feed from audit log (scoped to current user)
 router.get('/activity', optionalAuth, async (req, res, next) => {
   try {
-    const logs = await AuditLog.find()
+    const reqUser = await getReqUser(req)
+
+    // Build filter: only show the logged-in user's own activity
+    const filter = {}
+    if (reqUser) {
+      let uid
+      try { uid = new mongoose.Types.ObjectId(reqUser.id) } catch { uid = reqUser.id }
+      filter.userId = uid
+    }
+
+    const logs = await AuditLog.find(filter)
       .sort('-createdAt')
       .limit(10)
       .lean()
 
     const activities = logs.map(log => {
-      // Extract initials from the actual userName stored in audit log
       const name = log.userName || 'System'
       const initials = name === 'System' ? 'SYS'
         : name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
@@ -128,10 +154,9 @@ router.get('/activity', optionalAuth, async (req, res, next) => {
       }
     })
 
-    // Fallback if no audit logs
     if (activities.length === 0) {
       activities.push(
-        { user: 'SYS', text: 'System initialized. Create your first case to get started.', time: 'just now' }
+        { user: 'SYS', text: 'No activity yet. Create your first case to get started.', time: 'just now' }
       )
     }
 
@@ -141,10 +166,14 @@ router.get('/activity', optionalAuth, async (req, res, next) => {
   }
 })
 
-// GET /api/dashboard/iocs — get all threat intelligence indicators (IOCs) across all cases
+// GET /api/dashboard/iocs — threat IOCs scoped to accessible cases
 router.get('/iocs', optionalAuth, async (req, res, next) => {
   try {
-    const evidenceList = await Evidence.find()
+    const reqUser = await getReqUser(req)
+    const accessibleIds = reqUser ? await getAccessibleCaseIds(reqUser.id, reqUser.role) : []
+    const evidFilter = reqUser ? { caseId: { $in: accessibleIds } } : {}
+
+    const evidenceList = await Evidence.find(evidFilter)
       .populate('caseId', 'title caseNumber')
       .lean()
 
@@ -202,9 +231,11 @@ router.get('/iocs', optionalAuth, async (req, res, next) => {
   }
 })
 
-// GET /api/dashboard/notifications — notifications for bell icon
+// GET /api/dashboard/notifications — notifications for bell icon (scoped to current user)
 router.get('/notifications', optionalAuth, async (req, res, next) => {
   try {
+    const reqUser = await getReqUser(req)
+
     // Notification-worthy actions
     const notifActions = [
       'case_created', 'case_updated', 'case_closed',
@@ -214,7 +245,15 @@ router.get('/notifications', optionalAuth, async (req, res, next) => {
       'evidence_hash_check',
     ]
 
-    const logs = await AuditLog.find({ action: { $in: notifActions } })
+    // Only show notifications for the logged-in user's own actions
+    const filter = { action: { $in: notifActions } }
+    if (reqUser) {
+      let uid
+      try { uid = new mongoose.Types.ObjectId(reqUser.id) } catch { uid = reqUser.id }
+      filter.userId = uid
+    }
+
+    const logs = await AuditLog.find(filter)
       .sort('-createdAt')
       .limit(15)
       .lean()
@@ -239,7 +278,7 @@ router.get('/notifications', optionalAuth, async (req, res, next) => {
       id: log._id.toString(),
       text: `${actionMessages[log.action] || log.action}${log.details ? ' — ' + log.details.substring(0, 80) : ''}`,
       time: timeAgo(log.createdAt),
-      unread: i < 5, // Latest 5 are unread
+      unread: i < 5,
       action: log.action,
     }))
 
@@ -249,17 +288,24 @@ router.get('/notifications', optionalAuth, async (req, res, next) => {
   }
 })
 
-// GET /api/dashboard/search?q=query — global search across cases, reports, evidence
+// GET /api/dashboard/search?q=query — global search scoped to accessible cases
 router.get('/search', optionalAuth, async (req, res, next) => {
   try {
     const q = (req.query.q || '').trim()
     if (!q || q.length < 2) return res.json({ results: [] })
+
+    const reqUser = await getReqUser(req)
+    const accessibleIds = reqUser ? await getAccessibleCaseIds(reqUser.id, reqUser.role) : []
+    const caseFilter = reqUser ? { _id: { $in: accessibleIds } } : {}
+    const evidFilter = reqUser ? { caseId: { $in: accessibleIds } } : {}
+    const reportFilter = reqUser ? { caseId: { $in: accessibleIds } } : {}
 
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const regex = new RegExp(escaped, 'i')
 
     const [cases, reports, evidence] = await Promise.all([
       Case.find({
+        ...caseFilter,
         $or: [
           { title: regex },
           { caseNumber: regex },
@@ -267,32 +313,22 @@ router.get('/search', optionalAuth, async (req, res, next) => {
         ],
       }).limit(5).lean(),
       Report.find({
+        ...reportFilter,
         $or: [
           { title: regex },
           { reportNumber: regex },
         ],
       }).limit(5).lean(),
       Evidence.find({
+        ...evidFilter,
         originalName: regex,
       }).limit(5).lean(),
     ])
 
     const results = [
-      ...cases.map(c => ({
-        label: `${c.caseNumber} — ${c.title}`,
-        path: `/cases/${c._id}`,
-        category: 'Case',
-      })),
-      ...reports.map(r => ({
-        label: `${r.reportNumber} — ${r.title}`,
-        path: `/reports/${r._id}`,
-        category: 'Report',
-      })),
-      ...evidence.map(e => ({
-        label: e.originalName,
-        path: `/cases/${e.caseId}`,
-        category: 'Evidence',
-      })),
+      ...cases.map(c => ({ label: `${c.caseNumber} — ${c.title}`, path: `/cases/${c._id}`, category: 'Case' })),
+      ...reports.map(r => ({ label: `${r.reportNumber} — ${r.title}`, path: `/reports/${r._id}`, category: 'Report' })),
+      ...evidence.map(e => ({ label: e.originalName, path: `/cases/${e.caseId}`, category: 'Evidence' })),
     ]
 
     res.json({ results })

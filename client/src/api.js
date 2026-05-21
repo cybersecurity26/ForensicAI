@@ -61,6 +61,16 @@ export const updateCase = (id, data) => request(`/cases/${id}`, {
   method: 'PUT',
   body: JSON.stringify(data),
 })
+export const shareCase = (id, email) => request(`/cases/${id}/share`, {
+  method: 'POST',
+  body: JSON.stringify({ email }),
+})
+export const revokeCaseShare = (id, userId) => request(`/cases/${id}/share/${userId}`, {
+  method: 'DELETE',
+})
+export const migrateOwnership = () => request('/cases/migrate-ownership', {
+  method: 'POST',
+})
 
 // ─── Reports ───
 export const getReports = (params = {}) => {

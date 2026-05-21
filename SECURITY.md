@@ -10,7 +10,8 @@ ForensicAI is a **digital forensics investigation platform** that handles sensit
 
 | Version | Supported |
 |---|---|
-| 1.0.x (current) | ✅ Active support |
+| 1.1.x (current) | ✅ Active support |
+| 1.0.x | ✅ Security fixes only |
 | < 1.0 | ❌ No longer supported |
 
 ---
@@ -25,6 +26,8 @@ ForensicAI implements the following security measures:
 - **WebAuthn/FIDO2 Passkeys** for passwordless authentication
 - **bcryptjs** password hashing with salt rounds
 - **Role-Based Access Control (RBAC)** — Admin, Analyst, Investigator, Viewer
+- **Case-Level Access Control** — Users only see cases they created or were explicitly shared with; ObjectId type-safe access checks across all 6 backend routes
+- **User-Scoped Notifications** — Activity feeds and notifications are strictly scoped to the authenticated user
 
 ### Data Protection
 - **SHA-256 integrity hashing** for all uploaded evidence files
@@ -149,6 +152,8 @@ npm audit fix
 | File uploads | ✅ Validated | UUID filenames, size limits, type checks |
 | Evidence integrity | ✅ SHA-256 | Hash-on-upload with re-verification |
 | API rate limiting | ✅ Enabled | Configurable per-endpoint |
+| Case access control | ✅ Enforced | Owner/shared/admin checks on all routes |
+| Notification scoping | ✅ Enforced | User-scoped activity feed and notifications |
 | CSRF protection | ⚠️ Partial | JWT-based (no cookies), consider adding CSRF tokens for enhanced protection |
 | Input sanitization | ✅ Enabled | express-validator on all routes |
 | SQL Injection | ✅ N/A | MongoDB with Mongoose ODM (NoSQL) |

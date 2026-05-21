@@ -30,6 +30,15 @@ The platform upholds the **Human-in-the-Loop** principle: AI assists with analys
 - **Timeline Reconstruction** — Unified, filterable event timelines across multiple evidence sources with severity classification and date grouping
 - **Threat Indicators (IOCs) Dashboard** — Global aggregated board displaying all parsed IP reputation and malware hash threats across cases with filters, origin case linkage, and copy helpers
 
+### Access Control & Collaboration
+- **Case Ownership** — Each case tracks its creator (`createdBy`) and is only visible to the owner, admins, and explicitly shared users
+- **Case Sharing** — Share cases with other users by email; shared users gain read access to case details, evidence, reports, and timelines
+- **Revoke Access** — Case owners and admins can revoke shared access at any time via the Share Modal
+- **Viewer Role Restrictions** — Viewers can browse and chat but cannot create, edit, delete, upload, or generate content
+- **Admin Override** — Admins retain full visibility and management access across all cases
+- **User-Scoped Notifications** — Notification bell and activity feed show only the logged-in user's own actions
+- **Ownership Migration** — Admin-only tool to backfill ownership on legacy cases based on assignee data
+
 ### AI & Threat Intelligence Integration
 - **Automated Report Generation** — AI generates draft forensic reports with executive summaries, key findings, timelines, and recommendations
 - **Case Chat RAG Copilot** — Interactive assistant to ask natural language questions about logs within a specific case, retrieving top-scored relevant logs as prompt context
@@ -46,9 +55,9 @@ The platform upholds the **Human-in-the-Loop** principle: AI assists with analys
 - **Role-Based Access Control** — Admin, Analyst, Viewer, and Investigator roles
 
 ### Platform Features
-- **Interactive Dashboard** — Case activity charts, evidence type distribution, real-time activity feed
+- **Interactive Dashboard** — Case activity charts, evidence type distribution, real-time activity feed (scoped to current user)
 - **Global Search** — Live search across all cases, reports, and evidence files with categorized results
-- **Real-Time Notifications** — Bell icon with unread count, read persistence, and chime sound alerts
+- **Real-Time Notifications** — Bell icon with unread count, read persistence, and chime sound alerts (scoped to current user)
 - **Dark/Light Theme** — Full theme support with smooth transitions
 - **Audit Logging** — Every action is recorded in an immutable audit trail
 - **Legal Pages** — About, Privacy Policy, Terms of Use, Cookies Policy
@@ -358,8 +367,18 @@ The `.gitignore` excludes:
 | Test | Steps | Expected |
 |---|---|---|
 | Global Search | Type in header search bar (min 2 chars) | Categorized results (Page/Case/Report/Evidence) |
-| Notifications | Click bell icon | Real notifications from audit logs |
+| Notifications | Click bell icon | Only shows YOUR actions, not other users' |
 | Mark Read | Click notification or "Mark all read" | Persists across page reloads |
+
+### Access Control & Sharing
+| Test | Steps | Expected |
+|---|---|---|
+| Case Isolation | Log in as User A, create a case. Log in as User B | User B cannot see User A's case |
+| Share Case | User A → Case Detail → Share → enter User B's email | User B can now see the case |
+| Revoke Access | User A → Share Modal → Revoke User B | Case disappears from User B's list |
+| Viewer Restrictions | Log in as viewer role | Cannot see New Case, Edit, Delete, Upload, Generate buttons |
+| Admin Override | Log in as admin | Can see all cases from all users |
+| Ownership Migration | Admin → Settings → Run Migration | Legacy cases get assigned to their respective users |
 
 ### Theme
 | Test | Steps | Expected |

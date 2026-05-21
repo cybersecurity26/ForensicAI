@@ -156,7 +156,58 @@ Update a case. 🔒 **Requires Auth**
 ---
 
 ### DELETE `/cases/:id`
-Delete a case. 🔒 **Requires Auth (Admin)**
+Delete a case. 🔒 **Requires Auth (Admin/Owner)**
+
+---
+
+### POST `/cases/:id/share`
+Share a case with another user by email. 🔒 **Requires Auth (Owner/Admin)**
+
+**Body:**
+```json
+{
+  "email": "collaborator@example.com"
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Case shared with Lisa Carol",
+  "sharedWith": [
+    { "_id": "...", "name": "Lisa Carol", "email": "lisa@example.com", "role": "investigator" }
+  ]
+}
+```
+
+---
+
+### DELETE `/cases/:id/share/:userId`
+Revoke a user's access to a shared case. 🔒 **Requires Auth (Owner/Admin)**
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Access revoked",
+  "sharedWith": []
+}
+```
+
+---
+
+### POST `/cases/migrate-ownership`
+One-time migration: backfill `createdBy` from assignee data on legacy cases and fix shortened assignee names to full names. 🔒 **Requires Auth (Admin)**
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Fixed 5 ownership + 3 assignee names across 5 cases",
+  "ownershipFixed": 5,
+  "namesFixed": 3,
+  "total": 5,
+  "results": [...]
+}
+```
 
 ---
 
@@ -356,7 +407,7 @@ Update report sections. 🔒 **Requires Auth**
 ## 📊 Dashboard
 
 ### GET `/dashboard/stats`
-Get dashboard statistics. 🔒 **Optional Auth**
+Get dashboard statistics. 🔒 **Optional Auth** — Results scoped to accessible cases.
 
 **Response:** `200 OK`
 ```json
@@ -379,17 +430,17 @@ Get dashboard statistics. 🔒 **Optional Auth**
 ---
 
 ### GET `/dashboard/activity`
-Get recent activity feed. 🔒 **Optional Auth**
+Get recent activity feed. 🔒 **Optional Auth** — Only returns the logged-in user's own actions.
 
 ---
 
 ### GET `/dashboard/notifications`
-Get notification list from audit logs. 🔒 **Optional Auth**
+Get notification list from audit logs. 🔒 **Optional Auth** — Only returns notifications for the logged-in user's own actions.
 
 ---
 
 ### GET `/dashboard/search?q=query`
-Global search across cases, reports, evidence. 🔒 **Optional Auth**
+Global search across cases, reports, evidence. 🔒 **Optional Auth** — Results scoped to accessible cases.
 
 **Query:** `?q=network` (min 2 characters)
 

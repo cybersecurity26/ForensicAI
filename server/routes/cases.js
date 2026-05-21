@@ -1,5 +1,6 @@
 import express from 'express'
-import { body, validationResult, param } from 'express-validator'
+import { body, validationResult } from 'express-validator'
+import mongoose from 'mongoose'
 import Case from '../models/Case.js'
 import Evidence from '../models/Evidence.js'
 import User from '../models/User.js'
@@ -9,20 +10,90 @@ import { logAudit } from '../middleware/audit.js'
 
 const router = express.Router()
 
-// GET /api/cases — List all cases
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+/** Extract the string id from a value that may be an ObjectId, a populated doc, or a string */
+function toId(val) {
+  if (!val) return null
+  if (val._id) return val._id.toString()
+  return val.toString()
+}
+
+/**
+ * Resolve the request user. If authenticated returns { id, role }.
+ * Falls back to the first DB user for single-user / unauthenticated mode.
+ */
+async function getReqUser(req) {
+  if (req.user && req.user.id) return req.user
+  const dbUser = await User.findOne().lean()
+  if (dbUser) return { id: dbUser._id.toString(), role: dbUser.role }
+  return null
+}
+
+/**
+ * Build a Mongoose filter that returns only cases the user can see:
+ * - admins see everything
+ * - everyone else sees cases they created OR were shared with
+ */
+function buildAccessFilter(userId, role) {
+  if (role === 'admin') return {}
+  // Convert string userId to ObjectId for proper MongoDB array matching
+  let uid
+  try { uid = new mongoose.Types.ObjectId(userId) } catch { uid = userId }
+  return {
+    $or: [
+      { createdBy: uid },
+      { sharedWith: uid },
+    ],
+  }
+}
+
+/**
+ * Check whether a user may access a specific case document.
+ * Returns true for admins, owners, or users in sharedWith.
+ * Handles both populated and unpopulated sharedWith/createdBy fields.
+ */
+function canAccessCase(caseDoc, userId, role) {
+  if (role === 'admin') return true
+  const creatorId = toId(caseDoc.createdBy)
+  if (!creatorId) return false // unowned legacy case — only admins
+  if (creatorId === userId.toString()) return true
+  return (caseDoc.sharedWith || []).some(entry => toId(entry) === userId.toString())
+}
+
+function isOwnerOrAdmin(caseDoc, userId, role) {
+  if (role === 'admin') return true
+  const creatorId = toId(caseDoc.createdBy)
+  if (!creatorId) return false
+  return creatorId === userId.toString()
+}
+
+// ─── Routes ────────────────────────────────────────────────────────────────
+
+// GET /api/cases — List cases accessible to the current user
 router.get('/', optionalAuth, async (req, res, next) => {
   try {
     const { status, priority, search, page = 1, limit = 20, sort = '-createdAt' } = req.query
+    const reqUser = await getReqUser(req)
 
-    const filter = {}
+    const accessFilter = reqUser ? buildAccessFilter(reqUser.id, reqUser.role) : {}
+    const filter = { ...accessFilter }
+
     if (status && status !== 'all') filter.status = status
     if (priority) filter.priority = priority
     if (search) {
-      filter.$or = [
+      const searchOr = [
         { title: { $regex: search, $options: 'i' } },
         { caseNumber: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } },
       ]
+      // Merge search with existing $or if present
+      if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, { $or: searchOr }]
+        delete filter.$or
+      } else {
+        filter.$or = searchOr
+      }
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit)
@@ -47,15 +118,102 @@ router.get('/', optionalAuth, async (req, res, next) => {
   }
 })
 
-// GET /api/cases/:id — Get single case
+// POST /api/cases/migrate-ownership — One-time migration: backfill createdBy + fix assigneeNames
+router.post('/migrate-ownership', optionalAuth, async (req, res, next) => {
+  try {
+    const reqUser = await getReqUser(req)
+    if (reqUser && reqUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can run migrations' })
+    }
+
+    // Build lookup tables: shortName → user, id → user
+    const allUsers = await User.find({}, 'name email').lean()
+    const nameLookup = {}   // "vinay t." → user
+    const idLookup = {}     // ObjectId string → user
+    for (const u of allUsers) {
+      idLookup[u._id.toString()] = u
+      nameLookup[u.name.toLowerCase()] = u
+      const parts = u.name.split(' ')
+      if (parts.length >= 2) {
+        const shortName = `${parts[0]} ${parts[parts.length - 1][0]}.`.toLowerCase()
+        nameLookup[shortName] = u
+        nameLookup[parts[0].toLowerCase()] = u
+      }
+    }
+
+    let ownershipFixed = 0
+    let namesFixed = 0
+    const results = []
+
+    // Process ALL cases — fix both createdBy and assigneeName
+    const allCases = await Case.find()
+    for (const c of allCases) {
+      const updates = {}
+      let matchedUser = null
+
+      // 1. Resolve the owner user from assignee ObjectId or assigneeName
+      if (c.assignee && idLookup[c.assignee.toString()]) {
+        matchedUser = idLookup[c.assignee.toString()]
+      } else if (c.assigneeName) {
+        const normalised = c.assigneeName.toLowerCase().trim()
+        if (nameLookup[normalised]) matchedUser = nameLookup[normalised]
+      }
+
+      // 2. Backfill createdBy if missing
+      if (!c.createdBy) {
+        const ownerId = matchedUser?._id || (await User.findOne({ role: 'admin' }).lean())?._id
+        if (ownerId) {
+          updates.createdBy = ownerId
+          ownershipFixed++
+        }
+      }
+
+      // 3. Fix assigneeName to full name if it's a short name
+      if (matchedUser && c.assigneeName !== matchedUser.name) {
+        updates.assigneeName = matchedUser.name
+        namesFixed++
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await Case.findByIdAndUpdate(c._id, updates)
+        results.push({
+          caseNumber: c.caseNumber,
+          oldName: c.assigneeName,
+          newName: updates.assigneeName || c.assigneeName,
+          createdBySet: !!updates.createdBy,
+        })
+      }
+    }
+
+    await logAudit('migration_run', 'system', null,
+      `Migration: ${ownershipFixed} ownership + ${namesFixed} names fixed across ${allCases.length} cases`, req)
+
+    res.json({
+      message: `Fixed ${ownershipFixed} ownership + ${namesFixed} assignee names across ${allCases.length} cases`,
+      ownershipFixed,
+      namesFixed,
+      total: allCases.length,
+      results,
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// GET /api/cases/:id — Get single case (with sharedWith populated)
 router.get('/:id', optionalAuth, async (req, res, next) => {
   try {
+    const reqUser = await getReqUser(req)
+
     const caseDoc = await Case.findById(req.params.id)
       .populate('evidence')
       .populate('reports')
+      .populate('sharedWith', 'name email role')
 
-    if (!caseDoc) {
-      return res.status(404).json({ error: 'Case not found' })
+    if (!caseDoc) return res.status(404).json({ error: 'Case not found' })
+
+    if (reqUser && !canAccessCase(caseDoc, reqUser.id, reqUser.role)) {
+      return res.status(403).json({ error: 'Access denied to this case' })
     }
 
     res.json(caseDoc)
@@ -64,25 +222,36 @@ router.get('/:id', optionalAuth, async (req, res, next) => {
   }
 })
 
-// POST /api/cases — Create new case
+// POST /api/cases — Create new case (viewers cannot create)
 router.post('/', optionalAuth, [
   body('title').notEmpty().trim(),
   body('priority').optional().isIn(['low', 'medium', 'high', 'critical']),
 ], async (req, res, next) => {
   try {
     const errors = validationResult(req)
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() })
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() })
+
+    const reqUser = await getReqUser(req)
+    if (reqUser && reqUser.role === 'viewer') {
+      return res.status(403).json({ error: 'Viewers cannot create cases' })
     }
 
     const { title, description, priority, assigneeName, tags } = req.body
+
+    // Resolve assignee name — prefer provided name, fallback to logged-in user's name
+    let resolvedAssigneeName = assigneeName || ''
+    if (!resolvedAssigneeName && reqUser?.id) {
+      const userDoc = await User.findById(reqUser.id, 'name').lean()
+      if (userDoc) resolvedAssigneeName = userDoc.name
+    }
 
     const newCase = await Case.create({
       title,
       description: description || '',
       priority: priority || 'medium',
-      assigneeName: assigneeName || '',
-      assignee: req.user?.id,
+      assigneeName: resolvedAssigneeName,
+      assignee: reqUser?.id,
+      createdBy: reqUser?.id,
       tags: tags || [],
       status: 'draft',
     })
@@ -95,11 +264,22 @@ router.post('/', optionalAuth, [
   }
 })
 
-// PUT /api/cases/:id — Update case
+// PUT /api/cases/:id — Update case (viewers cannot update)
 router.put('/:id', optionalAuth, async (req, res, next) => {
   try {
-    const { title, description, status, priority, assigneeName, tags, notes } = req.body
+    const reqUser = await getReqUser(req)
+    if (reqUser && reqUser.role === 'viewer') {
+      return res.status(403).json({ error: 'Viewers cannot update cases' })
+    }
 
+    const caseDoc = await Case.findById(req.params.id)
+    if (!caseDoc) return res.status(404).json({ error: 'Case not found' })
+
+    if (reqUser && !canAccessCase(caseDoc, reqUser.id, reqUser.role)) {
+      return res.status(403).json({ error: 'Access denied to this case' })
+    }
+
+    const { title, description, status, priority, assigneeName, tags, notes } = req.body
     const updates = {}
     if (title !== undefined) updates.title = title
     if (description !== undefined) updates.description = description
@@ -112,10 +292,6 @@ router.put('/:id', optionalAuth, async (req, res, next) => {
 
     const updated = await Case.findByIdAndUpdate(req.params.id, updates, { new: true })
 
-    if (!updated) {
-      return res.status(404).json({ error: 'Case not found' })
-    }
-
     const action = status === 'closed' ? 'case_closed' : 'case_updated'
     await logAudit(action, 'case', updated._id, `Case ${updated.caseNumber} updated`, req)
 
@@ -125,18 +301,26 @@ router.put('/:id', optionalAuth, async (req, res, next) => {
   }
 })
 
-// DELETE /api/cases/:id — Delete case (soft delete by archiving)
+// DELETE /api/cases/:id — Archive case (viewers cannot delete)
 router.delete('/:id', optionalAuth, async (req, res, next) => {
   try {
+    const reqUser = await getReqUser(req)
+    if (reqUser && reqUser.role === 'viewer') {
+      return res.status(403).json({ error: 'Viewers cannot delete cases' })
+    }
+
+    const caseDoc = await Case.findById(req.params.id)
+    if (!caseDoc) return res.status(404).json({ error: 'Case not found' })
+
+    if (reqUser && !canAccessCase(caseDoc, reqUser.id, reqUser.role)) {
+      return res.status(403).json({ error: 'Access denied to this case' })
+    }
+
     const updated = await Case.findByIdAndUpdate(
       req.params.id,
       { status: 'archived' },
       { new: true }
     )
-
-    if (!updated) {
-      return res.status(404).json({ error: 'Case not found' })
-    }
 
     await logAudit('case_updated', 'case', updated._id, `Case ${updated.caseNumber} archived`, req)
 
@@ -146,17 +330,76 @@ router.delete('/:id', optionalAuth, async (req, res, next) => {
   }
 })
 
-// POST /api/cases/:id/chat — Ask questions about case evidence (RAG Chat)
+// POST /api/cases/:id/share — Share case with another user by email (owner/admin only)
+router.post('/:id/share', optionalAuth, async (req, res, next) => {
+  try {
+    const reqUser = await getReqUser(req)
+    const caseDoc = await Case.findById(req.params.id)
+    if (!caseDoc) return res.status(404).json({ error: 'Case not found' })
+
+    if (!reqUser || !isOwnerOrAdmin(caseDoc, reqUser.id, reqUser.role)) {
+      return res.status(403).json({ error: 'Only the case owner or admin can share this case' })
+    }
+
+    const { email } = req.body
+    if (!email) return res.status(400).json({ error: 'Email is required' })
+
+    const targetUser = await User.findOne({ email: email.toLowerCase().trim() })
+    if (!targetUser) return res.status(404).json({ error: `No user found with email: ${email}` })
+
+    const alreadyShared = (caseDoc.sharedWith || []).some(id => id.toString() === targetUser._id.toString())
+    if (alreadyShared) return res.status(409).json({ error: 'Case is already shared with this user' })
+
+    const isOwner = caseDoc.createdBy && caseDoc.createdBy.toString() === targetUser._id.toString()
+    if (isOwner) return res.status(409).json({ error: 'Cannot share case with its owner' })
+
+    await Case.findByIdAndUpdate(req.params.id, { $push: { sharedWith: targetUser._id } })
+    await logAudit('case_shared', 'case', caseDoc._id, `Case shared with ${targetUser.email}`, req)
+
+    const updated = await Case.findById(req.params.id).populate('sharedWith', 'name email role')
+    res.json({ message: `Case shared with ${targetUser.name}`, sharedWith: updated.sharedWith })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// DELETE /api/cases/:id/share/:userId — Revoke case access (owner/admin only)
+router.delete('/:id/share/:userId', optionalAuth, async (req, res, next) => {
+  try {
+    const reqUser = await getReqUser(req)
+    const caseDoc = await Case.findById(req.params.id)
+    if (!caseDoc) return res.status(404).json({ error: 'Case not found' })
+
+    if (!reqUser || !isOwnerOrAdmin(caseDoc, reqUser.id, reqUser.role)) {
+      return res.status(403).json({ error: 'Only the case owner or admin can revoke access' })
+    }
+
+    // Convert to ObjectId for proper $pull matching
+    let revokeUid
+    try { revokeUid = new mongoose.Types.ObjectId(req.params.userId) } catch { revokeUid = req.params.userId }
+
+    await Case.findByIdAndUpdate(req.params.id, { $pull: { sharedWith: revokeUid } })
+    await logAudit('case_share_revoked', 'case', caseDoc._id, `Access revoked for user ${req.params.userId}`, req)
+
+    const updated = await Case.findById(req.params.id).populate('sharedWith', 'name email role')
+    res.json({ message: 'Access revoked', sharedWith: updated.sharedWith })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /api/cases/:id/chat — RAG Chat (access-checked; all roles including viewer may chat)
 router.post('/:id/chat', optionalAuth, async (req, res, next) => {
   try {
     const { message, history = [] } = req.body
-    if (!message) {
-      return res.status(400).json({ error: 'Message is required' })
-    }
+    if (!message) return res.status(400).json({ error: 'Message is required' })
 
+    const reqUser = await getReqUser(req)
     const caseDoc = await Case.findById(req.params.id)
-    if (!caseDoc) {
-      return res.status(404).json({ error: 'Case not found' })
+    if (!caseDoc) return res.status(404).json({ error: 'Case not found' })
+
+    if (reqUser && !canAccessCase(caseDoc, reqUser.id, reqUser.role)) {
+      return res.status(403).json({ error: 'Access denied to this case' })
     }
 
     // 1. Gather all parsed events for this case
@@ -173,9 +416,9 @@ router.post('/:id/chat', optionalAuth, async (req, res, next) => {
       }
     }
 
-    // 2. Perform a local search/keyword matching to rank events based on user prompt
+    // 2. Keyword-based RAG ranking
     const keywords = message.toLowerCase()
-      .replace(/[^a-z0-9\s.]/g, '') // Keep dots for IPs
+      .replace(/[^a-z0-9\s.]/g, '')
       .split(/\s+/)
       .filter(word => word.length > 2)
 
@@ -184,27 +427,25 @@ router.post('/:id/chat', optionalAuth, async (req, res, next) => {
     // Get dynamic RAG context limit from user settings
     let ragContextLimit = 25
     try {
-      const user = await User.findOne()
-      if (user && user.settings.ragContextLimit) {
-        ragContextLimit = user.settings.ragContextLimit
+      const settingsUser = await User.findOne()
+      if (settingsUser && settingsUser.settings.ragContextLimit) {
+        ragContextLimit = settingsUser.settings.ragContextLimit
       }
     } catch (err) {
       console.error('Error loading RAG context limit:', err.message)
     }
 
     if (keywords.length === 0) {
-      // Return top events chronologically or severity sorted events if no query keywords
       matchedEvents = allEvents
         .sort((a, b) => (b.severity === 'critical' || b.severity === 'danger' ? 1 : -1))
         .slice(0, ragContextLimit)
     } else {
-      // Score each event based on keyword matches
       const scored = allEvents.map(event => {
         let score = 0
         const detailLower = (event.detail || '').toLowerCase()
         const rawLower = (event.raw || '').toLowerCase()
         const sourceLower = (event.source || '').toLowerCase()
-        
+
         for (const kw of keywords) {
           if (detailLower.includes(kw)) score += 5
           if (rawLower.includes(kw)) score += 3
@@ -213,14 +454,13 @@ router.post('/:id/chat', optionalAuth, async (req, res, next) => {
           if (event.mitreAttack?.techniqueName?.toLowerCase().includes(kw)) score += 8
           if (event.threatIntel?.details?.toLowerCase().includes(kw)) score += 8
         }
-        
-        // Boost matches based on severity
+
         if (score > 0) {
           if (event.severity === 'critical') score += 5
           if (event.severity === 'danger') score += 3
           if (event.severity === 'warning') score += 1
         }
-        
+
         return { event, score }
       })
 
@@ -231,7 +471,7 @@ router.post('/:id/chat', optionalAuth, async (req, res, next) => {
         .slice(0, ragContextLimit)
     }
 
-    // 3. Call AI Service to generate response
+    // 3. Call AI Service
     const answer = await generateChatResponse(caseDoc.title, history, matchedEvents, message)
 
     await logAudit('case_chat_queried', 'case', caseDoc._id, `Query: "${message.substring(0, 40)}..."`, req)
@@ -252,5 +492,4 @@ router.post('/:id/chat', optionalAuth, async (req, res, next) => {
     next(err)
   }
 })
-
 export default router

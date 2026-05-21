@@ -4,10 +4,33 @@ import path from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import Evidence from '../models/Evidence.js'
 import Case from '../models/Case.js'
+import User from '../models/User.js'
 import { computeFileHash, verifyFileHash } from '../utils/hash.js'
 import { parseLogFile } from '../utils/parser.js'
 import { optionalAuth } from '../middleware/auth.js'
 import { logAudit } from '../middleware/audit.js'
+
+// ─── Access helpers (shared with cases route) ────────────────────────────────
+function toId(val) {
+  if (!val) return null
+  if (val._id) return val._id.toString()
+  return val.toString()
+}
+
+async function getReqUser(req) {
+  if (req.user && req.user.id) return req.user
+  const dbUser = await User.findOne().lean()
+  if (dbUser) return { id: dbUser._id.toString(), role: dbUser.role }
+  return null
+}
+
+function canAccessCase(caseDoc, userId, role) {
+  if (role === 'admin') return true
+  const creatorId = toId(caseDoc.createdBy)
+  if (!creatorId) return false
+  if (creatorId === userId.toString()) return true
+  return (caseDoc.sharedWith || []).some(entry => toId(entry) === userId.toString())
+}
 
 const router = express.Router()
 
@@ -41,6 +64,13 @@ const upload = multer({
 // POST /api/evidence/upload — Upload evidence with SHA-256 hashing
 router.post('/upload', optionalAuth, upload.array('files', 10), async (req, res, next) => {
   try {
+    const reqUser = await getReqUser(req)
+
+    // Viewers cannot upload evidence
+    if (reqUser && reqUser.role === 'viewer') {
+      return res.status(403).json({ error: 'Viewers cannot upload evidence' })
+    }
+
     const { caseId } = req.body
 
     if (!caseId) {
@@ -50,6 +80,11 @@ router.post('/upload', optionalAuth, upload.array('files', 10), async (req, res,
     const caseDoc = await Case.findById(caseId)
     if (!caseDoc) {
       return res.status(404).json({ error: 'Case not found' })
+    }
+
+    // Verify current user has access to this case
+    if (reqUser && !canAccessCase(caseDoc, reqUser.id, reqUser.role)) {
+      return res.status(403).json({ error: 'Access denied to this case' })
     }
 
     const results = []
@@ -144,9 +179,20 @@ router.get('/:id', optionalAuth, async (req, res, next) => {
 // POST /api/evidence/:id/parse — Parse an evidence file
 router.post('/:id/parse', optionalAuth, async (req, res, next) => {
   try {
+    const reqUser = await getReqUser(req)
+    if (reqUser && reqUser.role === 'viewer') {
+      return res.status(403).json({ error: 'Viewers cannot parse evidence' })
+    }
+
     const evidence = await Evidence.findById(req.params.id)
     if (!evidence) {
       return res.status(404).json({ error: 'Evidence not found' })
+    }
+
+    // Check case access
+    const caseDoc = await Case.findById(evidence.caseId)
+    if (caseDoc && reqUser && !canAccessCase(caseDoc, reqUser.id, reqUser.role)) {
+      return res.status(403).json({ error: 'Access denied to this case' })
     }
 
     evidence.status = 'parsing'
@@ -211,9 +257,20 @@ router.post('/:id/parse', optionalAuth, async (req, res, next) => {
 // POST /api/evidence/:id/verify — Re-verify evidence integrity
 router.post('/:id/verify', optionalAuth, async (req, res, next) => {
   try {
+    const reqUser = await getReqUser(req)
+    if (reqUser && reqUser.role === 'viewer') {
+      return res.status(403).json({ error: 'Viewers cannot verify evidence' })
+    }
+
     const evidence = await Evidence.findById(req.params.id)
     if (!evidence) {
       return res.status(404).json({ error: 'Evidence not found' })
+    }
+
+    // Check case access
+    const caseDoc = await Case.findById(evidence.caseId)
+    if (caseDoc && reqUser && !canAccessCase(caseDoc, reqUser.id, reqUser.role)) {
+      return res.status(403).json({ error: 'Access denied to this case' })
     }
 
     const result = await verifyFileHash(evidence.filePath, evidence.sha256Hash)
@@ -243,6 +300,16 @@ router.post('/:id/verify', optionalAuth, async (req, res, next) => {
 // POST /api/evidence/parse-all/:caseId — Force re-parse ALL evidence for a case
 router.post('/parse-all/:caseId', optionalAuth, async (req, res, next) => {
   try {
+    const reqUser = await getReqUser(req)
+    if (reqUser && reqUser.role === 'viewer') {
+      return res.status(403).json({ error: 'Viewers cannot re-parse evidence' })
+    }
+
+    const caseDoc = await Case.findById(req.params.caseId)
+    if (caseDoc && reqUser && !canAccessCase(caseDoc, reqUser.id, reqUser.role)) {
+      return res.status(403).json({ error: 'Access denied to this case' })
+    }
+
     // Find ALL evidence for this case (including already-parsed ones)
     const evidenceList = await Evidence.find({ caseId: req.params.caseId })
 

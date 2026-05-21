@@ -1,15 +1,46 @@
 import express from 'express'
 import Evidence from '../models/Evidence.js'
+import Case from '../models/Case.js'
+import User from '../models/User.js'
 import { buildTimeline } from '../utils/parser.js'
 import { optionalAuth } from '../middleware/auth.js'
 
 const router = express.Router()
 
+// ─── Access helpers ──────────────────────────────────────────────────────
+function toId(val) {
+  if (!val) return null
+  if (val._id) return val._id.toString()
+  return val.toString()
+}
+
+async function getReqUser(req) {
+  if (req.user && req.user.id) return req.user
+  const dbUser = await User.findOne().lean()
+  if (dbUser) return { id: dbUser._id.toString(), role: dbUser.role }
+  return null
+}
+
+function canAccessCase(caseDoc, userId, role) {
+  if (role === 'admin') return true
+  const creatorId = toId(caseDoc.createdBy)
+  if (!creatorId) return false
+  if (creatorId === userId.toString()) return true
+  return (caseDoc.sharedWith || []).some(entry => toId(entry) === userId.toString())
+}
+
 // GET /api/timeline/:caseId — Get reconstructed timeline for a case
 router.get('/:caseId', optionalAuth, async (req, res, next) => {
   try {
+    const reqUser = await getReqUser(req)
     const { caseId } = req.params
     const { severity, source, limit: eventLimit } = req.query
+
+    // Check case access
+    const caseDoc = await Case.findById(caseId)
+    if (caseDoc && reqUser && !canAccessCase(caseDoc, reqUser.id, reqUser.role)) {
+      return res.status(403).json({ error: 'Access denied to this case' })
+    }
 
     const evidenceList = await Evidence.find({
       caseId,

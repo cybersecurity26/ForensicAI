@@ -3,9 +3,10 @@ import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import {
   Plus, Search, Filter, FolderOpen, Calendar,
-  User, MoreVertical, ArrowUpRight, X, ChevronDown, Loader
+  User, MoreVertical, ArrowUpRight, X, ChevronDown, Loader, Lock
 } from 'lucide-react'
 import { getCases, createCase as apiCreateCase } from '../api'
+import { useAuth } from '../context/AuthContext'
 
 const item = {
   hidden: { opacity: 0, y: 16 },
@@ -39,6 +40,8 @@ const fallbackCases = [
 ]
 
 export default function Cases() {
+  const { user } = useAuth()
+  const isViewer = user?.role === 'viewer'
   const [cases, setCases] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -50,7 +53,6 @@ export default function Cases() {
   const [newTitle, setNewTitle] = useState('')
   const [newDesc, setNewDesc] = useState('')
   const [newPriority, setNewPriority] = useState('medium')
-  const [newAssignee, setNewAssignee] = useState('Vinay T.')
 
   const fetchCases = async () => {
     try {
@@ -58,10 +60,10 @@ export default function Cases() {
       if (statusFilter !== 'all') params.status = statusFilter
       if (searchTerm) params.search = searchTerm
       const data = await getCases(params)
-      setCases(data.cases && data.cases.length > 0 ? data.cases : fallbackCases)
+      setCases(data.cases || [])
     } catch (err) {
       console.error('Failed to fetch cases:', err)
-      setCases(fallbackCases)
+      setCases([])
     } finally {
       setLoading(false)
     }
@@ -77,13 +79,11 @@ export default function Cases() {
         title: newTitle.trim(),
         description: newDesc.trim(),
         priority: newPriority,
-        assigneeName: newAssignee,
       })
       setShowModal(false)
       setNewTitle('')
       setNewDesc('')
       setNewPriority('medium')
-      setNewAssignee('Vinay T.')
       await fetchCases()
     } catch (err) {
       console.error('Failed to create case:', err)
@@ -100,9 +100,20 @@ export default function Cases() {
           <h1 className="page-title">Case Management</h1>
           <p className="page-description">Create, manage, and track digital forensic investigation cases.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)} id="create-case-btn">
-          <Plus size={16} /> New Case
-        </button>
+        {!isViewer && (
+          <button className="btn btn-primary" onClick={() => setShowModal(true)} id="create-case-btn">
+            <Plus size={16} /> New Case
+          </button>
+        )}
+        {isViewer && (
+          <span style={{
+            display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.78rem', fontWeight: 600,
+            color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)',
+            border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-sm)', padding: '6px 12px',
+          }}>
+            <Lock size={12} /> View Only Access
+          </span>
+        )}
       </div>
 
       {/* Filters */}
@@ -247,16 +258,13 @@ export default function Cases() {
               </div>
               <div className="form-group">
                 <label className="form-label">Assignee</label>
-                <select
-                  className="form-select"
-                  id="case-assignee-select"
-                  value={newAssignee}
-                  onChange={(e) => setNewAssignee(e.target.value)}
-                >
-                  <option>Vinay T.</option>
-                  <option>Sarah L.</option>
-                  <option>Henry F.</option>
-                </select>
+                <div className="form-input" style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  background: 'var(--bg-elevated)', cursor: 'default', opacity: 0.85,
+                }}>
+                  <User size={14} style={{ color: 'var(--accent-primary)' }} />
+                  {user?.name || 'You'}
+                </div>
               </div>
             </div>
 

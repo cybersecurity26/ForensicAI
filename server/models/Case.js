@@ -16,6 +16,8 @@ const caseSchema = new mongoose.Schema({
   },
   assignee: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   assigneeName: { type: String, default: '' },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  sharedWith: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   evidence: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Evidence' }],
   reports: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Report' }],
   tags: [{ type: String }],

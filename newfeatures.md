@@ -1,10 +1,10 @@
-# ForensicAI — New Features Briefing (v1.0.2)
+# ForensicAI — New Features Briefing (v1.1.0)
 *Internal Team Documentation & Architecture Reference*
 
 ---
 
 ## Executive Summary
-This document provides a detailed breakdown of the new features introduced in **ForensicAI v1.0.2**. These features are designed to transition the platform from a simple log parser and reporter to a **comprehensive Threat Intelligence and AI-Assisted Digital Forensics (DFIR) platform**.
+This document provides a detailed breakdown of the new features introduced in **ForensicAI v1.0.2 → v1.1.0**. The v1.0.2 release transitioned the platform from a simple log parser to a **comprehensive Threat Intelligence and AI-Assisted DFIR platform**. The v1.1.0 release adds **multi-user case isolation, collaboration, and access control** to make the platform production-ready for team environments.
 
 ---
 
@@ -18,13 +18,7 @@ The MITRE ATT&CK Mapping feature automatically correlates parsed log events dire
 - **Immediate Triage**: Instead of manually reading line-by-line to identify what stage an attacker is in, the matrix visually maps out the attack progression immediately upon log upload.
 
 ### Tools & Platforms Used
-- **Backend Rule Mapper (`server/utils/attackMapper.js`)**: A rule-based pattern matching engine that matches regexes to standard techniques:
-  - **T1110 (Brute Force)**: Matches "failed password" or "logon failure".
-  - **T1078 (Valid Accounts)**: Matches "accepted password" or "successful logon".
-  - **T1548.001 (Sudo/Su Abuse)**: Matches elevated privilege execution commands.
-  - **T1033/T1046 (Discovery)**: Matches reconnaissance utilities like `whoami`, `nmap`, or `netstat`.
-  - **T1105 (Ingress Tool Transfer)**: Matches fetch commands like `wget` or `curl`.
-  - **T1041 (Exfiltration)**: Matches data exfiltration events.
+- **Backend Rule Mapper (`server/utils/attackMapper.js`)**: A rule-based pattern matching engine that matches regexes to standard techniques.
 - **Frontend Matrix View (`client/src/pages/MitreAttack.jsx`)**: Responsive CSS-grid based matrix with dynamic glow states and interactive technique details.
 
 ---
@@ -32,117 +26,110 @@ The MITRE ATT&CK Mapping feature automatically correlates parsed log events dire
 ## 2. Threat Intelligence Integration (AbuseIPDB & VirusTotal)
 
 ### Use & Description
-ForensicAI now dynamically connects to AbuseIPDB and VirusTotal to check the reputation of IP addresses and file hashes extracted during log parsing:
-- **IP Reputation**: Checks AbuseIPDB for abuse confidence scores, domain names, and classification reports.
-- **File Hashing**: Queries VirusTotal for file hashes (SHA-256/MD5) to check malicious engine vote counts.
-- **Dynamic Configuration Badge**: Dashboards now check API key configurations on server start, displaying green (active/connected) or orange (offline/simulator fallback) badges.
-
-### Purpose & Why We Added It
-- **Enriched Log Context**: IP addresses and file hashes in logs are meaningless without reputation. Integrating third-party APIs flags known malicious IP addresses (e.g., botnet hosts) or file hashes (e.g., malware droppers) automatically.
-- **Offline / Zero-Config Simulator**: Allows the system to operate and mock threat detections even if external API credentials aren't configured yet.
+ForensicAI dynamically connects to AbuseIPDB and VirusTotal to check the reputation of IP addresses and file hashes extracted during log parsing.
 
 ### Tools & Platforms Used
 - **AbuseIPDB API**: Live IP reputation scores.
 - **VirusTotal API**: Antivirus reputation analysis.
-- **Axios / Node HTTPS client**: Handles async REST API request pools.
-- **Fallback Simulation Engine (`server/services/threatIntelService.js`)**: Generates deterministic risk scores based on traffic frequency metrics when API keys are not supplied.
+- **Fallback Simulation Engine (`server/services/threatIntelService.js`)**: Generates deterministic risk scores when API keys are not supplied.
 
 ---
 
 ## 3. Threat Indicators (IOCs) Dashboard
 
-### Use & Description
-The Indicators of Compromise (IOCs) Dashboard is a centralized, repository-wide board displaying all identified malicious threat indicators (IPs and file hashes) across all uploaded cases.
-
-### Purpose & Why We Added It
-- **Correlative Threat Hunting**: Investigators often need to find if an IP address detected in Case A is also active in Case B. The IOC Dashboard aggregates all threats globally.
-- **Actionable Workflow**: Features text searches, filter tags, severity badges, and direct links to navigate to the originating case detail or copy the IOC value instantly to the clipboard.
-
-### Tools & Platforms Used
-- **MongoDB Aggregation (`server/routes/dashboard.js`)**: Executes fast collection groupings to extract parsed events matching threat criteria.
-- **UI Components (`client/src/pages/ThreatIocs.jsx`)**: Designed with search filters, interactive detail modals, and copy-helper hooks.
+Centralized, repository-wide board displaying all identified malicious threat indicators (IPs and file hashes) across all uploaded cases with text search, severity filters, origin case linkage, and copy helpers.
 
 ---
 
 ## 4. Case Chat RAG Copilot
 
-### Use & Description
-The Case Chat Copilot is an interactive chatbot that allows investigators to converse directly with their case evidence files in natural language (e.g., *"Show me all successful logins from IP 192.168.1.50"* or *"Are there any signs of directory scanning?"*).
-
-### Purpose & Why We Added It
-- **Eliminate Log Drown**: Investigators spend hours filtering and querying database logs. The RAG Copilot acts as a digital assistant that fetches and summarizes log lines instantly.
-- **Traceable AI (Human-in-the-Loop)**: Unlike general chatbots that hallucinate, this copilot provides interactive **citation cards** that map back to the exact log file line number and timestamp.
-
-### Tools & Platforms Used
-- **Retrieval-Augmented Generation (RAG)**:
-  1. Tokenizes the user's chat query.
-  2. Runs a local search algorithm on log events.
-  3. Scores and ranks logs based on severity and keyword frequency.
-  4. Feeds the top 25 context logs to the LLM.
-- **Multi-LLM Service (`server/services/aiService.js`)**: Dynamically uses the configured LLM API (Mistral, Gemini, or OpenAI) to synthesize answers based on retrieved context.
-- **UI Layout (`client/src/pages/CaseChat.jsx`)**: Implements streaming-style messages, citations popups, and quick-prompt chips.
+Interactive chatbot allowing investigators to converse directly with their case evidence files in natural language with traceable citation cards.
 
 ---
 
 ## 5. Technical Stack & Environment Configurations
 
-To enable live threat reputation lookups and the Case Chat RAG Copilot, ensure the following environment variables are defined in the server's `.env` configuration file:
-
 ```ini
-# AI Configuration (OpenAI, Gemini, or Mistral)
-AI_PROVIDER=openai             # Choices: openai, gemini, mistral
+AI_PROVIDER=openai
 AI_API_KEY=your_api_key_here
-AI_MODEL=gpt-4o                # Or gemini-1.5-pro, mistral-small-latest
-
-# Threat Intelligence API Keys (Optional)
+AI_MODEL=gpt-4o
 ABUSEIPDB_API_KEY=your_abuseipdb_key
 VIRUSTOTAL_API_KEY=your_virustotal_key
 ```
-
-> [!NOTE]
-> If AbuseIPDB or VirusTotal API keys are omitted, the server dynamically switches to a local simulation mode. The dashboard will show an **Orange Badge** indicating simulation fallback, while configuring valid keys triggers the **Green Badge** indicating live mode.
-
----
 
 ---
 
 ## 6. Configurable AI & Threat Intel Settings
 
-### Use & Description
-Investigators can now manage key platform configurations directly from the **AI & Threat Intel** tab in the Settings page:
-- **API Key Management**: Securely configure and update API keys for OpenAI, Gemini, Mistral, AbuseIPDB, and VirusTotal. Input values are masked on load to protect secrets.
-- **Threat Severity Threshold**: A slider/input (0–100) that allows administrators to define the minimum risk score required to flag an IP or file hash as malicious.
-- **RAG Context Limit**: Configures the maximum number of logs (5–100) retrieved as context for the RAG chatbot query, optimizing performance and API token usage.
-
-### Purpose & Why We Added It
-- **Zero-Code Customization**: Enables security teams to update API keys and tuning parameters without modifying environment variables or restarting the backend server.
-- **Tuning and Optimization**: Allows teams to adjust response context limits to balance API costs and explanation details, and adjust threat scoring sensitivity based on their organization's risk tolerance.
+API Key Management, Threat Severity Threshold slider, and RAG Context Limit configuration — all from the Settings UI.
 
 ---
 
 ## 7. Real-Time Dashboard Statistics
 
-### Use & Description
-The investigation dashboard has been enhanced with two new indicators:
-- **Threat Indicators**: Displays the count of unique Indicators of Compromise (IPs and file hashes) parsed across all evidence files.
-- **Critical Threat Flags**: Shows the total count of severe threats (threat reputation score >= 90) needing immediate investigator review.
-
-### Purpose & Why We Added It
-- **At-a-Glance Triage**: Gives incident response managers an immediate understanding of threat volume and critical alarms without needing to open individual cases or navigate to the threat indicators tab.
+Threat Indicators count and Critical Threat Flags integrated into the main dashboard stats grid.
 
 ---
 
 ## 8. Compacted Legal Policies
 
-### Use & Description
-The platform's legal policies (`Privacy Policy`, `Terms of Use`, and `Cookies Policy`) have been streamlined and updated:
-- **Data Integrations Transparency**: Added disclosures detailing how logs containing IP addresses or file hashes are forwarded to AbuseIPDB, VirusTotal, and LLM providers (Mistral, Google, OpenAI) for analysis.
-- **Compact Layout**: Formatted policy pages with clear collapsible/compact sections for readability and rapid compliance reviews.
-
-### Purpose & Why We Added It
-- **Regulatory Compliance**: Ensures transparency in client data transmission, explaining why external services receive forensic identifiers and how chain-of-custody privacy is preserved.
+Privacy, Terms, and Cookies policies updated with data integration transparency disclosures.
 
 ---
 
-*ForensicAI v1.0.2 — Internal Release Briefing Document*
+## 9. Case Ownership & Access Control (v1.1.0)
 
+### Use & Description
+Each case now tracks its creator (`createdBy`) and an explicit list of collaborators (`sharedWith`). Non-admin users only see cases they own or have been shared with. All backend routes enforce these access controls consistently.
+
+### Purpose & Why We Added It
+- **Multi-User Isolation**: In team environments, investigators should only see their own cases. This prevents accidental cross-contamination of evidence and maintains confidentiality.
+- **Role-Based Enforcement**: Viewers can browse and chat but cannot create, edit, delete, upload, or generate any content.
+- **Admin Override**: Administrators retain full visibility for oversight and compliance purposes.
+
+### Technical Implementation
+- **Case Model**: Added `createdBy` (ObjectId ref to User) and `sharedWith` (ObjectId[] ref to User) fields.
+- **Access Helpers**: `buildAccessFilter()`, `canAccessCase()`, `getAccessibleCaseIds()`, and `isOwnerOrAdmin()` — used across all 6 route files (cases, evidence, reports, timeline, dashboard, audit).
+- **ObjectId Type Safety**: A `toId()` helper extracts string IDs from populated Mongoose documents, raw ObjectIds, or strings uniformly. MongoDB queries convert string user IDs to ObjectIds for reliable `$or` matching.
+
+---
+
+## 10. Case Sharing & Collaboration (v1.1.0)
+
+### Use & Description
+Case owners and admins can share a case with any registered user by email. Shared users gain read access to the case detail, evidence, reports, timeline, MITRE matrix, and IOCs. Access can be revoked at any time.
+
+### Purpose & Why We Added It
+- **Controlled Collaboration**: Investigators often need to share findings with colleagues, legal teams, or management without giving them blanket access.
+- **Revocable Access**: Access can be granted and revoked per-user, maintaining the principle of least privilege.
+
+### Technical Implementation
+- **API Endpoints**: `POST /cases/:id/share` (by email) and `DELETE /cases/:id/share/:userId` (revoke, with ObjectId conversion for `$pull`).
+- **Share Case Modal** (`CaseDetail.jsx`): Animated modal with email invite form, shared user list with role badges, and per-user revoke buttons.
+- **Audit Trail**: `case_shared` and `case_share_revoked` actions are logged.
+
+---
+
+## 11. Ownership Migration Tool (v1.1.0)
+
+### Use & Description
+An admin-only migration tool that backfills `createdBy` from the `assignee` field on legacy cases and fixes shortened assignee names (e.g., "Vinay T." → "Vinay Tirukoti") to full user names.
+
+### Technical Implementation
+- **Endpoint**: `POST /cases/migrate-ownership` — processes ALL cases, resolves users by ObjectId or fuzzy name matching.
+- **Settings UI**: Admin-only "Migrate Case Ownership" button in Settings → Profile tab.
+
+---
+
+## 12. User-Scoped Notifications & Activity Feed (v1.1.0)
+
+### Use & Description
+The notification bell and dashboard activity feed now only display the logged-in user's own actions. Previously, all users saw a global feed of everyone's activities.
+
+### Technical Implementation
+- **Activity Feed** (`GET /dashboard/activity`): Filters AuditLog by `userId = reqUser.id` with ObjectId conversion.
+- **Notifications** (`GET /dashboard/notifications`): Same userId filter applied to notification-worthy audit actions.
+
+---
+
+*ForensicAI v1.1.0 — Internal Release Briefing Document*
