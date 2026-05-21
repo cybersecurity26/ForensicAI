@@ -62,6 +62,42 @@ export function renderMarkdown(text) {
     const line = lines[i]
     const trimmed = line.trim()
 
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      flushParagraph()
+      if (inUl) { output.push('</ul>'); inUl = false }
+      if (inOl) { output.push('</ol>'); inOl = false }
+
+      const tableLines = []
+      while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
+        tableLines.push(lines[i].trim())
+        i++
+      }
+      i-- // decrement so the outer loop doesn't skip the non-table line
+
+      const parsedCells = (row) => row.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim())
+      const isSeparator = (row) => /^[\s|:\-]+$/.test(row)
+      
+      let tableHtml = '<div class="chat-table-container"><table class="chat-table">'
+      let headerDone = false
+      
+      for (const tl of tableLines) {
+        if (isSeparator(tl)) {
+          headerDone = true
+          continue
+        }
+        const cells = parsedCells(tl)
+        if (!headerDone) {
+          tableHtml += '<thead><tr>' + cells.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>'
+          headerDone = true
+        } else {
+          tableHtml += '<tr>' + cells.map(c => `<td>${c}</td>`).join('') + '</tr>'
+        }
+      }
+      tableHtml += '</tbody></table></div>'
+      output.push(tableHtml)
+      continue
+    }
+
     const headerMatch = line.match(/^([#]{1,6})\s+(.*)$/)
     const ulMatch = line.match(/^\s*[-*+]\s+(.*)$/)
     const olMatch = line.match(/^\s*(\d+)\.\s+(.*)$/)

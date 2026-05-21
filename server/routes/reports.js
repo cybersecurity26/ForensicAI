@@ -91,6 +91,87 @@ router.post('/generate', optionalAuth, async (req, res, next) => {
 ${timelineRows}`
     }
 
+    // Aggregate Threat Indicators (IOCs)
+    const iocMap = new Map() // indicator -> { type, score, details, count }
+    for (const event of timeline.events) {
+      const ips = (event.detail || event.raw || '').match(/\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g) || []
+      const hashes = (event.detail || event.raw || '').match(/\b[a-fA-F0-9]{32}\b|\b[a-fA-F0-9]{64}\b/g) || []
+
+      const score = event.threatIntel?.score || 0
+      const isMalicious = event.threatIntel?.isMalicious || false
+      const details = event.threatIntel?.details || 'Detected in logs'
+
+      if (score > 0 || isMalicious) {
+        const indicators = [...new Set([...ips, ...hashes])]
+        for (const ind of indicators) {
+          const isIp = ips.includes(ind)
+          if (iocMap.has(ind)) {
+            const current = iocMap.get(ind)
+            current.count++
+            if (score > current.score) {
+              current.score = score
+              current.details = details
+            }
+          } else {
+            iocMap.set(ind, {
+              type: isIp ? 'IP Address' : 'Cryptographic Hash',
+              score,
+              details,
+              count: 1
+            })
+          }
+        }
+      }
+    }
+
+    let iocsSection = ''
+    if (iocMap.size === 0) {
+      iocsSection = 'No malicious indicators of compromise (IOCs) were flagged in the threat intelligence databases during log analysis.'
+    } else {
+      const iocRows = Array.from(iocMap.entries()).map(([indicator, info]) => {
+        const safeDetails = info.details.replace(/\|/g, ',').replace(/\n/g, ' ')
+        return `| \`${indicator}\` | ${info.type} | ${info.score} / 100 | ${safeDetails} | ${info.count} |`
+      }).join('\n')
+      iocsSection = `The following high-risk Indicators of Compromise (IOCs) were identified in the logs and verified against Threat Intelligence databases:
+
+| Indicator (IOC) | Type | Threat Score | Details / Reputation | Occurrences |
+|---|---|---|---|---|
+${iocRows}`
+    }
+
+    // Aggregate MITRE ATT&CK Matrix
+    const mitreMap = new Map() // techniqueId -> { tactic, name, count }
+    for (const event of timeline.events) {
+      if (event.mitreAttack && event.mitreAttack.techniqueId) {
+        const { techniqueId, techniqueName, tactic } = event.mitreAttack
+        if (mitreMap.has(techniqueId)) {
+          mitreMap.get(techniqueId).count++
+        } else {
+          mitreMap.set(techniqueId, {
+            tactic: tactic || 'Unknown Tactic',
+            name: techniqueName || 'Unknown Technique',
+            count: 1
+          })
+        }
+      }
+    }
+
+    let mitreSection = ''
+    if (mitreMap.size === 0) {
+      mitreSection = 'No MITRE ATT&CK techniques were mapped from the analyzed evidence files.'
+    } else {
+      const mitreRows = Array.from(mitreMap.entries()).map(([techId, info]) => {
+        const safeTactic = info.tactic.replace(/\|/g, ',').replace(/\n/g, ' ')
+        const safeName = info.name.replace(/\|/g, ',').replace(/\n/g, ' ')
+        return `| ${safeTactic} | ${techId} | ${safeName} | ${info.count} |`
+      }).join('\n')
+      mitreSection = `The following MITRE ATT&CK techniques were mapped from the analyzed log events:
+
+| Tactic | Technique ID | Technique Name | Detections |
+|---|---|---|---|
+${mitreRows}`
+    }
+
     // Create report number
     const reportCount = await Report.countDocuments({ caseId })
     const reportNumber = `${caseDoc.caseNumber}-R${reportCount + 1}`
@@ -106,7 +187,9 @@ ${timelineRows}`
         { title: 'Evidence Inventory', content: evidenceInventory, order: 2, aiGenerated: false, confidence: 100, status: 'draft' },
         { title: 'Timeline of Events', content: timelineSection || 'No events found. Upload and parse evidence to generate timeline.', order: 3, aiGenerated: true, confidence: 85, status: 'draft' },
         { title: 'Key Findings', content: findingsResult.content, order: 4, aiGenerated: true, confidence: findingsResult.confidence, status: 'needs-review' },
-        { title: 'Recommendations', content: recommendationsResult.content, order: 5, aiGenerated: true, confidence: recommendationsResult.confidence, status: 'draft' },
+        { title: 'Threat Indicators (IOCs)', content: iocsSection, order: 5, aiGenerated: true, confidence: 90, status: 'draft' },
+        { title: 'MITRE ATT&CK Matrix', content: mitreSection, order: 6, aiGenerated: true, confidence: 90, status: 'draft' },
+        { title: 'Recommendations', content: recommendationsResult.content, order: 7, aiGenerated: true, confidence: recommendationsResult.confidence, status: 'draft' },
       ],
     })
 
@@ -216,8 +299,18 @@ router.get('/:id/export', optionalAuth, async (req, res, next) => {
         doc.moveDown(0.3)
       }
 
-      doc.fontSize(10).fillColor('#333')
-        .text(section.content || '[No content]', { lineGap: 3 })
+      const content = section.content || '[No content]'
+      const contentLines = content.split(/\r?\n/)
+      for (const line of contentLines) {
+        if (line.trim().startsWith('|')) {
+          doc.font('Courier').fontSize(8.5).fillColor('#333')
+            .text(line, { lineGap: 1 })
+        } else {
+          doc.font('Helvetica').fontSize(10).fillColor('#333')
+            .text(line, { lineGap: 3 })
+        }
+      }
+      doc.font('Helvetica') // Reset to default font
       doc.moveDown(1)
     }
 

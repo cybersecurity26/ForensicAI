@@ -2558,3 +2558,37 @@ a:hover {
   padding: 1px 4px;
   border-radius: 3px;
 }
+
+/* Chat Tables */
+.chat-table-container {
+  overflow-x: auto;
+  margin: 12px 0;
+  border-radius: 6px;
+  border: 1px solid var(--border-primary);
+  background: rgba(0, 0, 0, 0.2);
+}
+.chat-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  text-align: left;
+}
+.chat-table th {
+  padding: 10px 14px;
+  background: rgba(0, 212, 255, 0.08);
+  color: var(--accent-primary);
+  font-weight: 700;
+  border-bottom: 1px solid var(--border-primary);
+}
+.chat-table td {
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+.chat-table tr:last-child td {
+  border-bottom: none;
+}
+.chat-table tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}

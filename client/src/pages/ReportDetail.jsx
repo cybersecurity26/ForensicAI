@@ -259,6 +259,9 @@ export default function ReportDetail() {
           strong { font-weight: 700; }
           ul, ol { margin: 8px 0; padding-left: 24px; }
           li { margin: 4px 0; }
+          table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+          th { padding: 8px 12px; background-color: #f5f5f5 !important; border: 1px solid #ccc !important; color: #000 !important; font-weight: 700; text-align: left; }
+          td { padding: 8px 12px; border: 1px solid #ddd !important; vertical-align: top; color: #333 !important; }
         </style></head><body>
         <div class="header">
           <div class="confidential">Confidential — For Authorized Personnel Only</div>
@@ -313,6 +316,9 @@ export default function ReportDetail() {
           strong { font-weight: 700; }
           ul, ol { margin: 8px 0; padding-left: 24px; }
           li { margin: 4px 0; }
+          table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+          th { padding: 8px 12px; background-color: #eee !important; border: 1px solid #ccc !important; color: #111 !important; font-weight: 700; text-align: left; }
+          td { padding: 8px 12px; border: 1px solid #ddd !important; vertical-align: top; color: #444 !important; }
         </style></head><body>
         <div class="banner">👁 Preview Mode — This is a read-only preview of the report draft.</div>
         <div class="header">
