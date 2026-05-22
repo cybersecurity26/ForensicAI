@@ -55,7 +55,7 @@ router.put('/profile', optionalAuth, async (req, res, next) => {
       user.email = email.toLowerCase()
     }
     if (role) {
-      if (role === 'admin') {
+      if (role === 'admin' && user.role !== 'admin') {
         return res.status(400).json({ error: 'Cannot assign Administrator role' })
       }
       user.role = role

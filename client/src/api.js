@@ -69,9 +69,7 @@ export const shareCase = (id, email) => request(`/cases/${id}/share`, {
 export const revokeCaseShare = (id, userId) => request(`/cases/${id}/share/${userId}`, {
   method: 'DELETE',
 })
-export const migrateOwnership = () => request('/cases/migrate-ownership', {
-  method: 'POST',
-})
+
 
 // ─── Reports ───
 export const getReports = (params = {}) => {
