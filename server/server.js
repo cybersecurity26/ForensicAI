@@ -25,6 +25,9 @@ const __dirname = path.dirname(__filename)
 const app = express()
 const PORT = process.env.PORT || 5000
 
+// Trust proxy for express-rate-limit behind reverse proxy (e.g. Render)
+app.set('trust proxy', 1)
+
 // ─── Ensure upload directory exists ───
 const uploadDir = process.env.UPLOAD_DIR || './uploads'
 if (!fs.existsSync(uploadDir)) {
