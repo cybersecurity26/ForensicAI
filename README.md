@@ -50,6 +50,9 @@ The platform upholds the **Human-in-the-Loop** principle: AI assists with analys
 
 ### Security & Authentication
 - **JWT Authentication** — Secure token-based sessions
+- **Two-Stage Registration with Email Verification** — New signups receive a 6-digit OTP verification code via email and must verify it before account activation
+- **In-App Email Verification Overlay** — Logged-in unverified users are blocked by a premium, glassmorphic overlay until their email is verified
+- **Secure SMTP Mail Delivery** — Backend email notifications and OTP codes are delivered securely using Gmail SMTP server
 - **Two-Factor Authentication (TOTP)** — Optional 2FA with authenticator app support
 - **WebAuthn Passkeys** — Modern passwordless authentication
 - **Role-Based Access Control** — Admin, Analyst, Viewer, and Investigator roles

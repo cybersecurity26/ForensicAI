@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [1.2.0] — 2026-05-22
+
+### Added
+- **Two-Stage Signup with OTP Verification**: New users verify their email address via a 6-digit OTP code sent directly during the sign-up process before account activation.
+- **In-App Email Verification Modal**: Existing logged-in, unverified users are presented with a premium, glassmorphic backdrop overlay blocking main interactions until verification is completed.
+- **Gmail SMTP Integration**: Back-end email notifications are routed via secure Gmail SMTP utilizing highly aesthetic dark-themed HTML templates.
+
+### Changed
+- **Removed Administrator Registration**: Removed the "Administrator" role option from the login/signup and settings profile page.
+- **Administrator Footnote**: Added the footnote *"For Administrator Please Contact System Admin"* below the role selection field on the signup and profile pages.
+- **Email Change Verification Reset**: Modifying email in profile resets verification status, immediately prompting verification.
+
+---
+
 ## [1.1.0] — 2026-05-21
 
 ### Added

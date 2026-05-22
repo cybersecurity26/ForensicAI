@@ -51,18 +51,26 @@ router.put('/profile', optionalAuth, async (req, res, next) => {
     const user = await getUser(req)
 
     if (name) user.name = name
-    if (email) user.email = email
-    if (role) user.role = role
+    if (email && email.toLowerCase() !== user.email.toLowerCase()) {
+      user.email = email.toLowerCase()
+      user.isEmailVerified = false
+    }
+    if (role) {
+      if (role === 'admin') {
+        return res.status(400).json({ error: 'Cannot assign Administrator role' })
+      }
+      user.role = role
+    }
     if (organization !== undefined) user.organization = organization
 
     await user.save()
     await logAudit('profile_updated', 'user', user._id, `Profile updated for ${user.name}`, req)
 
-    // Re-issue JWT so the client immediately reflects the new name/role without re-login
+    // Re-issue JWT so the client immediately reflects the new name/role/verification without re-login
     let newToken
     try {
       newToken = jwt.sign(
-        { id: user._id, name: user.name, email: user.email, role: user.role },
+        { id: user._id, name: user.name, email: user.email, role: user.role, isVerified: user.isEmailVerified },
         process.env.JWT_SECRET,
         { expiresIn: '24h' }
       )
@@ -73,6 +81,7 @@ router.put('/profile', optionalAuth, async (req, res, next) => {
       email: user.email,
       role: user.role,
       organization: user.organization,
+      isVerified: user.isEmailVerified,
       ...(newToken ? { token: newToken } : {}),
     })
   } catch (err) {

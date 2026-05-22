@@ -11,6 +11,7 @@ import {
 import User from '../models/User.js'
 import { authMiddleware, optionalAuth } from '../middleware/auth.js'
 import { logAudit } from '../middleware/audit.js'
+import { sendOtpMail } from '../services/mailService.js'
 
 const router = express.Router()
 
@@ -20,12 +21,15 @@ const ORIGIN = process.env.ORIGIN || 'http://localhost:5173'
 
 // In-memory challenge store (per-user, short-lived)
 const challengeStore = new Map()
+// In-memory OTP store for signups (email -> { otp, expires })
+const signupOtpStore = new Map()
 
 // POST /api/auth/register
 router.post('/register', [
   body('name').notEmpty().trim().escape(),
   body('email').isEmail().normalizeEmail(),
   body('password').isLength({ min: 8 }),
+  body('otp').notEmpty().trim(),
 ], async (req, res, next) => {
   try {
     const errors = validationResult(req)
@@ -33,7 +37,20 @@ router.post('/register', [
       return res.status(400).json({ errors: errors.array() })
     }
 
-    const { name, email, password, role, organization } = req.body
+    const { name, email, password, role, organization, otp } = req.body
+
+    if (role === 'admin') {
+      return res.status(400).json({ error: 'Cannot sign up as Administrator role' })
+    }
+
+    // Verify OTP code
+    const storedRecord = signupOtpStore.get(email.toLowerCase())
+    if (!storedRecord || storedRecord.otp !== otp || storedRecord.expires < Date.now()) {
+      return res.status(400).json({ error: 'Invalid or expired verification code' })
+    }
+
+    // Delete used OTP
+    signupOtpStore.delete(email.toLowerCase())
 
     const existing = await User.findOne({ email })
     if (existing) {
@@ -46,10 +63,11 @@ router.post('/register', [
       name, email, passwordHash,
       role: role || 'investigator',
       organization: organization || '',
+      isEmailVerified: true,
     })
 
     const token = jwt.sign(
-      { id: user._id, name: user.name, email: user.email, role: user.role },
+      { id: user._id, name: user.name, email: user.email, role: user.role, isVerified: true },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     )
@@ -58,7 +76,7 @@ router.post('/register', [
 
     res.status(201).json({
       token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+      user: { id: user._id, name: user.name, email: user.email, role: user.role, isVerified: true },
     })
   } catch (err) {
     next(err)
@@ -105,7 +123,7 @@ router.post('/login', [
 
     // No 2FA — issue full token
     const token = jwt.sign(
-      { id: user._id, name: user.name, email: user.email, role: user.role },
+      { id: user._id, name: user.name, email: user.email, role: user.role, isVerified: user.isEmailVerified },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     )
@@ -114,7 +132,7 @@ router.post('/login', [
 
     res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+      user: { id: user._id, name: user.name, email: user.email, role: user.role, isVerified: user.isEmailVerified },
       sessionTimeout: user.settings.sessionTimeout,
     })
   } catch (err) {
@@ -218,7 +236,7 @@ router.post('/passkey/authenticate', async (req, res, next) => {
 
     // Issue full JWT
     const token = jwt.sign(
-      { id: user._id, name: user.name, email: user.email, role: user.role },
+      { id: user._id, name: user.name, email: user.email, role: user.role, isVerified: user.isEmailVerified },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     )
@@ -227,7 +245,7 @@ router.post('/passkey/authenticate', async (req, res, next) => {
 
     res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+      user: { id: user._id, name: user.name, email: user.email, role: user.role, isVerified: user.isEmailVerified },
       sessionTimeout: user.settings.sessionTimeout,
     })
   } catch (err) {
@@ -361,6 +379,98 @@ router.delete('/passkey/:credentialId', authMiddleware, async (req, res, next) =
         credentialId: pk.credentialId,
         createdAt: pk.createdAt,
       })),
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /api/auth/signup/send-otp
+router.post('/signup/send-otp', async (req, res, next) => {
+  try {
+    const { email } = req.body
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' })
+    }
+
+    const emailLower = email.toLowerCase().trim()
+    const existing = await User.findOne({ email: emailLower })
+    if (existing) {
+      return res.status(409).json({ error: 'Email already registered' })
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString()
+    signupOtpStore.set(emailLower, {
+      otp,
+      expires: Date.now() + 5 * 60 * 1000 // 5 minutes
+    })
+
+    await sendOtpMail(emailLower, otp)
+    res.json({ success: true, message: 'Verification code sent to email' })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /api/auth/send-otp (Authenticated)
+router.post('/send-otp', authMiddleware, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id)
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString()
+    user.emailVerificationCode = otp
+    user.emailVerificationExpires = new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
+    await user.save()
+
+    await sendOtpMail(user.email, otp)
+    res.json({ success: true, message: 'Verification code sent to email' })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /api/auth/verify-otp (Authenticated)
+router.post('/verify-otp', authMiddleware, async (req, res, next) => {
+  try {
+    const { otp } = req.body
+    if (!otp) {
+      return res.status(400).json({ error: 'Verification code is required' })
+    }
+
+    const user = await User.findById(req.user.id)
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    if (
+      !user.emailVerificationCode ||
+      user.emailVerificationCode !== otp ||
+      !user.emailVerificationExpires ||
+      user.emailVerificationExpires < new Date()
+    ) {
+      return res.status(400).json({ error: 'Invalid or expired verification code' })
+    }
+
+    user.isEmailVerified = true
+    user.emailVerificationCode = undefined
+    user.emailVerificationExpires = undefined
+    await user.save()
+
+    const token = jwt.sign(
+      { id: user._id, name: user.name, email: user.email, role: user.role, isVerified: true },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    )
+
+    await logAudit('email_verified', 'user', user._id, `Email ${user.email} verified successfully`, req)
+
+    res.json({
+      success: true,
+      token,
+      user: { id: user._id, name: user.name, email: user.email, role: user.role, isVerified: true },
     })
   } catch (err) {
     next(err)

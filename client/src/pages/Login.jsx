@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Shield, Eye, EyeOff, LogIn, UserPlus, Mail, Lock, User, Building2, ChevronRight, Fingerprint, KeyRound } from 'lucide-react'
-import { loginUser, registerUser, getPasskeyAuthOptions, authenticatePasskey } from '../api'
+import { loginUser, registerUser, getPasskeyAuthOptions, authenticatePasskey, sendSignupOtp } from '../api'
 import { useAuth } from '../context/AuthContext'
 import { startAuthentication } from '@simplewebauthn/browser'
 
@@ -22,6 +22,10 @@ export default function Login() {
   const [organization, setOrganization] = useState('')
   const [role, setRole] = useState('investigator')
 
+  // Signup OTP state
+  const [otpSent, setOtpSent] = useState(false)
+  const [otp, setOtp] = useState('')
+
   // 2FA state
   const [requires2FA, setRequires2FA] = useState(false)
   const [loginToken, setLoginToken] = useState('')
@@ -30,38 +34,71 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    if (isSignup && password !== confirmPassword) {
-      setError('Passwords do not match')
-      return
-    }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters')
-      return
-    }
-    setLoading(true)
-    try {
-      let data
-      if (isSignup) {
-        data = await registerUser({ name, email, password, role, organization })
-      } else {
-        data = await loginUser(email, password)
+    if (isSignup) {
+      if (password !== confirmPassword) {
+        setError('Passwords do not match')
+        return
       }
-
-      // Check if 2FA is required
-      if (data.requires2FA) {
-        setLoginToken(data.loginToken)
-        setRequires2FA(true)
-        setLoading(false)
+      if (password.length < 8) {
+        setError('Password must be at least 8 characters')
         return
       }
 
-      login(data.token, data.user, data.sessionTimeout)
-      navigate('/')
-    } catch (err) {
-      setError(err.message || 'Authentication failed')
-    } finally {
-      setLoading(false)
+      if (!otpSent) {
+        setLoading(true)
+        try {
+          await sendSignupOtp(email)
+          setOtpSent(true)
+        } catch (err) {
+          setError(err.message || 'Failed to send OTP verification email')
+        } finally {
+          setLoading(false)
+        }
+        return
+      }
+
+      if (!otp || otp.length !== 6) {
+        setError('Please enter a valid 6-digit OTP code')
+        return
+      }
+
+      setLoading(true)
+      try {
+        const data = await registerUser({ name, email, password, role, organization, otp })
+        login(data.token, data.user, data.sessionTimeout)
+        navigate('/')
+      } catch (err) {
+        setError(err.message || 'Registration failed')
+      } finally {
+        setLoading(false)
+      }
+    } else {
+      setLoading(true)
+      try {
+        const data = await loginUser(email, password)
+
+        // Check if 2FA is required
+        if (data.requires2FA) {
+          setLoginToken(data.loginToken)
+          setRequires2FA(true)
+          setLoading(false)
+          return
+        }
+
+        login(data.token, data.user, data.sessionTimeout)
+        navigate('/')
+      } catch (err) {
+        setError(err.message || 'Authentication failed')
+      } finally {
+        setLoading(false)
+      }
     }
+  }
+
+  const handleCancelOtp = () => {
+    setOtpSent(false)
+    setOtp('')
+    setError('')
   }
 
   const handle2FAVerify = async () => {
@@ -201,13 +238,13 @@ export default function Login() {
                   <div className="login-toggle">
                     <button
                       className={`login-toggle-btn ${!isSignup ? 'active' : ''}`}
-                      onClick={() => { setIsSignup(false); setError('') }}
+                      onClick={() => { setIsSignup(false); setOtpSent(false); setOtp(''); setError('') }}
                     >
                       <LogIn size={14} /> Sign In
                     </button>
                     <button
                       className={`login-toggle-btn ${isSignup ? 'active' : ''}`}
-                      onClick={() => { setIsSignup(true); setError('') }}
+                      onClick={() => { setIsSignup(true); setOtpSent(false); setOtp(''); setError('') }}
                     >
                       <UserPlus size={14} /> Sign Up
                     </button>
@@ -231,59 +268,95 @@ export default function Login() {
                   <form onSubmit={handleSubmit} className="login-form">
                     <AnimatePresence mode="wait">
                       <motion.div
-                        key={isSignup ? 'signup' : 'login'}
-                        initial={{ opacity: 0, x: isSignup ? 30 : -30 }}
+                        key={isSignup ? (otpSent ? 'signup-otp' : 'signup') : 'login'}
+                        initial={{ opacity: 0, x: 30 }}
                         animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: isSignup ? -30 : 30 }}
+                        exit={{ opacity: 0, x: -30 }}
                         transition={{ duration: 0.3 }}
                       >
-                        {isSignup && (
-                          <div className="login-field">
-                            <div className="login-field-icon"><User size={16} /></div>
-                            <input type="text" placeholder="Full Name" value={name}
-                              onChange={(e) => setName(e.target.value)} required autoComplete="name" />
+                        {isSignup && otpSent ? (
+                          <div style={{ padding: '8px 0', textAlign: 'center' }}>
+                            <p style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.65)', marginBottom: 20, lineHeight: 1.5 }}>
+                              We have sent a verification code to <strong style={{ color: '#00e0ff' }}>{email}</strong>.<br />
+                              Enter the 6-digit OTP to complete registration.
+                            </p>
+                            <div className="login-field">
+                              <div className="login-field-icon"><KeyRound size={16} /></div>
+                              <input
+                                type="text"
+                                placeholder="Verification Code"
+                                value={otp}
+                                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                required
+                                style={{ letterSpacing: '4px', textAlign: 'center', fontSize: '1.05rem' }}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleCancelOtp}
+                              style={{
+                                background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
+                                fontSize: '0.8rem', cursor: 'pointer', padding: '8px 0', textDecoration: 'underline'
+                              }}
+                            >
+                              ← Back to Edit Details
+                            </button>
                           </div>
-                        )}
-
-                        <div className="login-field">
-                          <div className="login-field-icon"><Mail size={16} /></div>
-                          <input type="email" placeholder="Email Address" value={email}
-                            onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
-                        </div>
-
-                        <div className="login-field">
-                          <div className="login-field-icon"><Lock size={16} /></div>
-                          <input type={showPassword ? 'text' : 'password'} placeholder="Password"
-                            value={password} onChange={(e) => setPassword(e.target.value)}
-                            required autoComplete={isSignup ? 'new-password' : 'current-password'} />
-                          <button type="button" className="login-eye-btn" onClick={() => setShowPassword(!showPassword)}>
-                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
-                        </div>
-
-                        {isSignup && (
+                        ) : (
                           <>
+                            {isSignup && (
+                              <div className="login-field">
+                                <div className="login-field-icon"><User size={16} /></div>
+                                <input type="text" placeholder="Full Name" value={name}
+                                  onChange={(e) => setName(e.target.value)} required autoComplete="name" />
+                              </div>
+                            )}
+
+                            <div className="login-field">
+                              <div className="login-field-icon"><Mail size={16} /></div>
+                              <input type="email" placeholder="Email Address" value={email}
+                                onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+                            </div>
+
                             <div className="login-field">
                               <div className="login-field-icon"><Lock size={16} /></div>
-                              <input type="password" placeholder="Confirm Password" value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)} required autoComplete="new-password" />
+                              <input type={showPassword ? 'text' : 'password'} placeholder="Password"
+                                value={password} onChange={(e) => setPassword(e.target.value)}
+                                required autoComplete={isSignup ? 'new-password' : 'current-password'} />
+                              <button type="button" className="login-eye-btn" onClick={() => setShowPassword(!showPassword)}>
+                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                              </button>
                             </div>
 
-                            <div className="login-field">
-                              <div className="login-field-icon"><Building2 size={16} /></div>
-                              <input type="text" placeholder="Organization (optional)" value={organization}
-                                onChange={(e) => setOrganization(e.target.value)} autoComplete="organization" />
-                            </div>
+                            {isSignup && (
+                              <>
+                                <div className="login-field">
+                                  <div className="login-field-icon"><Lock size={16} /></div>
+                                  <input type="password" placeholder="Confirm Password" value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)} required autoComplete="new-password" />
+                                </div>
 
-                            <div className="login-field">
-                              <div className="login-field-icon"><Shield size={16} /></div>
-                              <select value={role} onChange={(e) => setRole(e.target.value)}>
-                                <option value="investigator">Investigator</option>
-                                <option value="analyst">Analyst</option>
-                                <option value="admin">Administrator</option>
-                                <option value="viewer">Viewer</option>
-                              </select>
-                            </div>
+                                <div className="login-field">
+                                  <div className="login-field-icon"><Building2 size={16} /></div>
+                                  <input type="text" placeholder="Organization (optional)" value={organization}
+                                    onChange={(e) => setOrganization(e.target.value)} autoComplete="organization" />
+                                </div>
+
+                                <div className="login-field" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
+                                  <div style={{ display: 'flex', position: 'relative', width: '100%' }}>
+                                    <div className="login-field-icon"><Shield size={16} /></div>
+                                    <select value={role} onChange={(e) => setRole(e.target.value)} style={{ paddingLeft: '40px', width: '100%' }}>
+                                      <option value="investigator">Investigator</option>
+                                      <option value="analyst">Analyst</option>
+                                      <option value="viewer">Viewer</option>
+                                    </select>
+                                  </div>
+                                  <div className="role-footnote" style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', marginTop: '4px', textAlign: 'left', paddingLeft: '8px' }}>
+                                    For Administrator Please Contact System Admin
+                                  </div>
+                                </div>
+                              </>
+                            )}
                           </>
                         )}
                       </motion.div>
@@ -294,7 +367,7 @@ export default function Login() {
                         <div className="login-spinner" />
                       ) : (
                         <>
-                          {isSignup ? 'Create Account' : 'Sign In'}
+                          {isSignup ? (otpSent ? 'Verify & Create Account' : 'Send Verification OTP') : 'Sign In'}
                           <ChevronRight size={18} />
                         </>
                       )}

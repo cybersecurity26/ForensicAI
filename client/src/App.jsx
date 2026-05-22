@@ -16,6 +16,7 @@ import Login from './pages/Login'
 import MitreAttack from './pages/MitreAttack'
 import CaseChat from './pages/CaseChat'
 import ThreatIocs from './pages/ThreatIocs'
+import EmailVerificationModal from './components/EmailVerificationModal'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth()
@@ -24,7 +25,7 @@ function ProtectedRoute({ children }) {
 }
 
 function AppRoutes() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // If on login page, render without sidebar/header
@@ -39,6 +40,7 @@ function AppRoutes() {
 
   return (
     <div className="app-layout">
+      {user && !user.isVerified && <EmailVerificationModal />}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="main-wrapper">
         <Header onMenuToggle={() => setSidebarOpen(prev => !prev)} />

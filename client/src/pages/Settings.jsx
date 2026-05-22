@@ -240,9 +240,12 @@ export default function Settings() {
                       <select className="form-select" value={role} onChange={e => setRole(e.target.value)}>
                         <option value="investigator">Senior Investigator</option>
                         <option value="analyst">Lead Analyst</option>
-                        <option value="admin">Administrator</option>
+                        {role === 'admin' && <option value="admin">Administrator</option>}
                         <option value="viewer">Viewer</option>
                       </select>
+                      <div className="role-footnote" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        For Administrator Please Contact System Admin
+                      </div>
                     </div>
                     <div className="form-group">
                       <label className="form-label">Organization</label>
