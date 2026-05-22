@@ -53,7 +53,6 @@ router.put('/profile', optionalAuth, async (req, res, next) => {
     if (name) user.name = name
     if (email && email.toLowerCase() !== user.email.toLowerCase()) {
       user.email = email.toLowerCase()
-      user.isEmailVerified = false
     }
     if (role) {
       if (role === 'admin') {

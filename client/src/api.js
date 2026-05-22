@@ -39,17 +39,7 @@ export const registerUser = (data) => request('/auth/register', {
   method: 'POST',
   body: JSON.stringify(data),
 })
-export const sendSignupOtp = (email) => request('/auth/signup/send-otp', {
-  method: 'POST',
-  body: JSON.stringify({ email }),
-})
-export const sendLoggedInOtp = () => request('/auth/send-otp', {
-  method: 'POST',
-})
-export const verifyLoggedInOtp = (otp) => request('/auth/verify-otp', {
-  method: 'POST',
-  body: JSON.stringify({ otp }),
-})
+
 
 // ─── Dashboard ───
 export const getDashboardStats = () => request('/dashboard/stats')

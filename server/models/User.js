@@ -9,7 +9,7 @@ const userSchema = new mongoose.Schema({
     enum: ['investigator', 'analyst', 'admin', 'viewer'],
     default: 'investigator',
   },
-  isEmailVerified: { type: Boolean, default: false },
+  isEmailVerified: { type: Boolean, default: true },
   emailVerificationCode: { type: String },
   emailVerificationExpires: { type: Date },
   organization: { type: String, default: '' },
