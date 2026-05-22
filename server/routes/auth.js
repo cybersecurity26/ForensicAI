@@ -405,8 +405,18 @@ router.post('/signup/send-otp', async (req, res, next) => {
       expires: Date.now() + 5 * 60 * 1000 // 5 minutes
     })
 
-    await sendOtpMail(emailLower, otp)
-    res.json({ success: true, message: 'Verification code sent to email' })
+    console.log(`🔑 [OTP VERIFICATION] Generated verification code for ${emailLower}: ${otp}`)
+
+    try {
+      await sendOtpMail(emailLower, otp)
+      res.json({ success: true, message: 'Verification code sent to email' })
+    } catch (mailErr) {
+      console.error(`❌ SMTP Failed to send to ${emailLower}:`, mailErr.message)
+      res.status(200).json({
+        success: true,
+        message: `[Demo Mode] SMTP is blocked on Render Free tier. Use verification code: ${otp} to continue.`
+      })
+    }
   } catch (err) {
     next(err)
   }
@@ -425,8 +435,18 @@ router.post('/send-otp', authMiddleware, async (req, res, next) => {
     user.emailVerificationExpires = new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
     await user.save()
 
-    await sendOtpMail(user.email, otp)
-    res.json({ success: true, message: 'Verification code sent to email' })
+    console.log(`🔑 [OTP VERIFICATION] Generated verification code for ${user.email}: ${otp}`)
+
+    try {
+      await sendOtpMail(user.email, otp)
+      res.json({ success: true, message: 'Verification code sent to email' })
+    } catch (mailErr) {
+      console.error(`❌ SMTP Failed to send to ${user.email}:`, mailErr.message)
+      res.status(200).json({
+        success: true,
+        message: `[Demo Mode] SMTP is blocked on Render Free tier. Use verification code: ${otp} to continue.`
+      })
+    }
   } catch (err) {
     next(err)
   }

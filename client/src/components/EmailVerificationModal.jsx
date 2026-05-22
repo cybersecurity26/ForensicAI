@@ -10,13 +10,18 @@ export default function EmailVerificationModal() {
   const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const [success, setSuccess] = useState(false)
 
   const handleSendOtp = async () => {
     setError('')
+    setInfo('')
     setLoading(true)
     try {
-      await sendLoggedInOtp()
+      const res = await sendLoggedInOtp()
+      if (res && res.message) {
+        setInfo(res.message)
+      }
       setOtpSent(true)
     } catch (err) {
       setError(err.message || 'Failed to send verification code.')
@@ -143,6 +148,21 @@ export default function EmailVerificationModal() {
                 }}>
                   <AlertCircle size={16} />
                   <span>{error}</span>
+                </div>
+              )}
+
+              {info && (
+                <div style={{
+                  background: 'rgba(0, 224, 255, 0.1)',
+                  border: '1px solid rgba(0, 224, 255, 0.35)',
+                  borderRadius: '8px',
+                  padding: '12px 14px',
+                  color: '#00e0ff',
+                  fontSize: '0.84rem',
+                  lineHeight: '1.4',
+                  marginBottom: '20px',
+                }}>
+                  <span>{info}</span>
                 </div>
               )}
 

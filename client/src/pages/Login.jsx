@@ -25,6 +25,7 @@ export default function Login() {
   // Signup OTP state
   const [otpSent, setOtpSent] = useState(false)
   const [otp, setOtp] = useState('')
+  const [info, setInfo] = useState('')
 
   // 2FA state
   const [requires2FA, setRequires2FA] = useState(false)
@@ -34,6 +35,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    setInfo('')
     if (isSignup) {
       if (password !== confirmPassword) {
         setError('Passwords do not match')
@@ -47,7 +49,10 @@ export default function Login() {
       if (!otpSent) {
         setLoading(true)
         try {
-          await sendSignupOtp(email)
+          const res = await sendSignupOtp(email)
+          if (res && res.message) {
+            setInfo(res.message)
+          }
           setOtpSent(true)
         } catch (err) {
           setError(err.message || 'Failed to send OTP verification email')
@@ -99,6 +104,7 @@ export default function Login() {
     setOtpSent(false)
     setOtp('')
     setError('')
+    setInfo('')
   }
 
   const handle2FAVerify = async () => {
@@ -238,13 +244,13 @@ export default function Login() {
                   <div className="login-toggle">
                     <button
                       className={`login-toggle-btn ${!isSignup ? 'active' : ''}`}
-                      onClick={() => { setIsSignup(false); setOtpSent(false); setOtp(''); setError('') }}
+                      onClick={() => { setIsSignup(false); setOtpSent(false); setOtp(''); setError(''); setInfo('') }}
                     >
                       <LogIn size={14} /> Sign In
                     </button>
                     <button
                       className={`login-toggle-btn ${isSignup ? 'active' : ''}`}
-                      onClick={() => { setIsSignup(true); setOtpSent(false); setOtp(''); setError('') }}
+                      onClick={() => { setIsSignup(true); setOtpSent(false); setOtp(''); setError(''); setInfo('') }}
                     >
                       <UserPlus size={14} /> Sign Up
                     </button>
@@ -260,6 +266,31 @@ export default function Login() {
                         exit={{ opacity: 0, height: 0 }}
                       >
                         {error}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Info / Success */}
+                  <AnimatePresence>
+                    {info && (
+                      <motion.div
+                        className="login-info"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        style={{
+                          background: 'rgba(0, 224, 255, 0.1)',
+                          border: '1px solid rgba(0, 224, 255, 0.35)',
+                          borderRadius: '8px',
+                          padding: '12px 14px',
+                          color: '#00e0ff',
+                          fontSize: '0.84rem',
+                          lineHeight: '1.45',
+                          marginBottom: '15px',
+                          textAlign: 'left',
+                        }}
+                      >
+                        {info}
                       </motion.div>
                     )}
                   </AnimatePresence>
