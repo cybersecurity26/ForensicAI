@@ -26,8 +26,10 @@ export function optionalAuth(req, res, next) {
       const token = authHeader.split(' ')[1]
       req.user = jwt.verify(token, process.env.JWT_SECRET)
     } catch (err) {
-      // Ignore invalid tokens for optional auth
+      return res.status(401).json({ error: 'Invalid or expired token' })
     }
+  } else if (process.env.NODE_ENV === 'production') {
+    return res.status(401).json({ error: 'Authentication required' })
   }
 
   next()

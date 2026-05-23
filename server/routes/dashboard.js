@@ -12,8 +12,10 @@ const router = express.Router()
 // ─── Access helpers ──────────────────────────────────────────────────────
 async function getReqUser(req) {
   if (req.user && req.user.id) return req.user
-  const dbUser = await User.findOne().lean()
-  if (dbUser) return { id: dbUser._id.toString(), role: dbUser.role }
+  if (process.env.NODE_ENV !== 'production') {
+    const dbUser = await User.findOne().lean()
+    if (dbUser) return { id: dbUser._id.toString(), role: dbUser.role }
+  }
   return null
 }
 

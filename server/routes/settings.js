@@ -13,19 +13,22 @@ async function getUser(req) {
     const user = await User.findById(req.user.id)
     if (user) return user
   }
-  // Fallback: get or create default user (for unauthenticated/single-user mode)
-  let user = await User.findOne()
-  if (!user) {
-    const passwordHash = await bcrypt.hash('admin123', 12)
-    user = await User.create({
-      name: 'Admin',
-      email: 'admin@forensicai.com',
-      passwordHash,
-      role: 'admin',
-      organization: 'ForensicAI Labs',
-    })
+  if (process.env.NODE_ENV !== 'production') {
+    // Fallback: get or create default user (for unauthenticated/single-user mode)
+    let user = await User.findOne()
+    if (!user) {
+      const passwordHash = await bcrypt.hash('admin123', 12)
+      user = await User.create({
+        name: 'Admin',
+        email: 'admin@forensicai.com',
+        passwordHash,
+        role: 'admin',
+        organization: 'ForensicAI Labs',
+      })
+    }
+    return user
   }
-  return user
+  return null
 }
 
 // GET /api/settings/profile — Get current user profile
