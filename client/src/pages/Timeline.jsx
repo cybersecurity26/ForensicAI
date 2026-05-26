@@ -27,6 +27,7 @@ export default function Timeline() {
   const [cases, setCases] = useState([])
   const [selectedCaseId, setSelectedCaseId] = useState('')
   const [timelineData, setTimelineData] = useState([])
+  const [attackAlerts, setAttackAlerts] = useState([])
   const [loading, setLoading] = useState(false)
   const [filterType, setFilterType] = useState('all')
 
@@ -43,9 +44,11 @@ export default function Timeline() {
     setLoading(true)
     getTimeline(selectedCaseId).then(data => {
       setTimelineData(data.dateGroups || [])
+      setAttackAlerts(data.attackAlerts || [])
     }).catch(err => {
       console.error('Timeline fetch error:', err)
       setTimelineData([])
+      setAttackAlerts([])
     }).finally(() => setLoading(false))
   }, [selectedCaseId])
 
@@ -93,6 +96,44 @@ export default function Timeline() {
           ))}
         </div>
       </div>
+
+      {attackAlerts.length > 0 && !loading && (
+        <div className="glow-card" style={{ marginBottom: 24 }}>
+          <div className="glow-card-inner" style={{ padding: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <AlertTriangle size={18} style={{ color: 'var(--accent-danger)' }} />
+              <div>
+                <div className="section-title" style={{ fontSize: '1rem' }}>Correlated Attack Alerts</div>
+                <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                  Deterministic rules correlated events across the selected case timeline.
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 10 }}>
+              {attackAlerts.slice(0, 6).map(alert => {
+                const colors = typeColors[alert.severity] || typeColors.warning
+                return (
+                  <div key={alert.id} style={{
+                    border: `1px solid ${colors.border}`,
+                    background: colors.bg,
+                    borderRadius: 'var(--radius-sm)',
+                    padding: 12,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
+                      <strong style={{ fontSize: '0.84rem' }}>{alert.title}</strong>
+                      <span style={{ color: colors.text, fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}>{alert.riskScore}</span>
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>{alert.description}</div>
+                    <div style={{ marginTop: 8, fontSize: '0.7rem', color: colors.text, fontFamily: 'var(--font-mono)' }}>
+                      {alert.mitreAttack?.techniqueId || alert.ruleId} · {alert.eventCount} events
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Timeline Content */}
       {loading ? (

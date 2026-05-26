@@ -23,6 +23,13 @@ const KNOWN_THREATS = {
   '4a5e1e4ca3261730d114f201d120a11a': { score: 96, isMalicious: true, details: 'VirusTotal: 48/68 engines flag as Malware.Backdoor.CobaltStrike' }
 }
 
+function isUsableApiKey(apiKey) {
+  if (!apiKey) return false
+  const value = String(apiKey).trim()
+  if (!value || value.startsWith('••••')) return false
+  return !/^your[_-]/i.test(value) && !/api[_-]?key[_-]?here/i.test(value)
+}
+
 /**
  * Clean and filter public IPs only (excludes private network blocks)
  */
@@ -70,7 +77,7 @@ export async function getIpReputation(ip) {
   }
 
   // If API key is set, query real AbuseIPDB API
-  if (apiKey && apiKey !== 'your_api_key_here') {
+  if (isUsableApiKey(apiKey)) {
     try {
       const response = await fetch(`https://api.abuseipdb.com/api/v2/check?ipAddress=${encodeURIComponent(ip)}&maxAgeInDays=90`, {
         headers: {
@@ -138,7 +145,7 @@ export async function getHashReputation(hash) {
     console.error('Error loading VirusTotal API key:', err.message)
   }
 
-  if (apiKey && apiKey !== 'your_api_key_here') {
+  if (isUsableApiKey(apiKey)) {
     try {
       const response = await fetch(`https://www.virustotal.com/api/v3/files/${cleanHash}`, {
         headers: { 'x-apikey': apiKey }

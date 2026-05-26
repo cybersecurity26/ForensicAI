@@ -67,11 +67,12 @@ router.get('/stats', optionalAuth, async (req, res, next) => {
         for (const e of ev.parsedData.events) {
           if (e.threatIntel && e.threatIntel.score > 0) {
             let value = null
-            const ipMatch = e.detail?.match(/\b((?:[0-9]{1,3}\.){3}[0-9]{1,3})\b/)
+            const ipMatch = e.sourceIp || e.detail?.match(/\b((?:[0-9]{1,3}\.){3}[0-9]{1,3})\b/)?.[1] || e.raw?.match(/\b((?:[0-9]{1,3}\.){3}[0-9]{1,3})\b/)?.[1]
             if (ipMatch) {
-              value = ipMatch[1]
+              value = ipMatch
             } else {
-              const hashMatch = e.detail?.match(/\b([a-fA-F0-9]{32})\b|\b([a-fA-F0-9]{64})\b/)
+              const hashMatch = e.detail?.match(/\b([a-fA-F0-9]{32})\b|\b([a-fA-F0-9]{64})\b/) ||
+                e.raw?.match(/\b([a-fA-F0-9]{32})\b|\b([a-fA-F0-9]{64})\b/)
               if (hashMatch) value = hashMatch[1] || hashMatch[2]
             }
             if (value) {
@@ -190,13 +191,14 @@ router.get('/iocs', optionalAuth, async (req, res, next) => {
             let type = 'Malicious Hash'
             
             // Extract IP
-            const ipMatch = e.detail?.match(/\b((?:[0-9]{1,3}\.){3}[0-9]{1,3})\b/)
+            const ipMatch = e.sourceIp || e.detail?.match(/\b((?:[0-9]{1,3}\.){3}[0-9]{1,3})\b/)?.[1] || e.raw?.match(/\b((?:[0-9]{1,3}\.){3}[0-9]{1,3})\b/)?.[1]
             if (ipMatch) {
-              value = ipMatch[1]
+              value = ipMatch
               type = 'IP Reputation'
             } else {
               // Extract MD5/SHA256 Hash
-              const hashMatch = e.detail?.match(/\b([a-fA-F0-9]{32})\b|\b([a-fA-F0-9]{64})\b/)
+              const hashMatch = e.detail?.match(/\b([a-fA-F0-9]{32})\b|\b([a-fA-F0-9]{64})\b/) ||
+                e.raw?.match(/\b([a-fA-F0-9]{32})\b|\b([a-fA-F0-9]{64})\b/)
               if (hashMatch) {
                 value = hashMatch[1] || hashMatch[2]
                 type = 'Malware Hash'

@@ -16,6 +16,7 @@ import Login from './pages/Login'
 import MitreAttack from './pages/MitreAttack'
 import CaseChat from './pages/CaseChat'
 import ThreatIocs from './pages/ThreatIocs'
+import AnomalyDashboard from './pages/AnomalyDashboard'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth()
@@ -51,6 +52,7 @@ function AppRoutes() {
             <Route path="/timeline" element={<ProtectedRoute><Timeline /></ProtectedRoute>} />
             <Route path="/mitre" element={<ProtectedRoute><MitreAttack /></ProtectedRoute>} />
             <Route path="/iocs" element={<ProtectedRoute><ThreatIocs /></ProtectedRoute>} />
+            <Route path="/anomalies" element={<ProtectedRoute><AnomalyDashboard /></ProtectedRoute>} />
             <Route path="/chat" element={<ProtectedRoute><CaseChat /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
             <Route path="/reports/:id" element={<ProtectedRoute><ReportDetail /></ProtectedRoute>} />

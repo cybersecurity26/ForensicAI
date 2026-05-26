@@ -101,11 +101,38 @@ export const uploadEvidence = (caseId, files) => {
 }
 export const parseEvidence = (evidenceId) => request(`/evidence/${evidenceId}/parse`, { method: 'POST' })
 export const parseAllEvidence = (caseId) => request(`/evidence/parse-all/${caseId}`, { method: 'POST' })
+export const parseFiles = (files, options = {}) => {
+  const formData = new FormData()
+  files.forEach(file => formData.append('files', file))
+  const query = options.limit ? `?limit=${encodeURIComponent(options.limit)}` : ''
+  const token = getToken()
+  const headers = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  return fetch(`${BASE}/parse${query}`, { method: 'POST', body: formData, headers }).then(async r => {
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: 'Parse failed' }))
+      throw new Error(err.error || err.message || 'Parse failed')
+    }
+    return r.json()
+  })
+}
+
+export const getJobs = (params = {}) => {
+  const q = new URLSearchParams(params).toString()
+  return request(`/jobs${q ? '?' + q : ''}`)
+}
+export const getJob = (id) => request(`/jobs/${id}`)
 
 // ─── Timeline ───
 export const getTimeline = (caseId, params = {}) => {
   const q = new URLSearchParams(params).toString()
   return request(`/timeline/${caseId}${q ? '?' + q : ''}`)
+}
+
+// ─── Anomaly Detection ───
+export const getAnomalies = (params = {}) => {
+  const q = new URLSearchParams(params).toString()
+  return request(`/anomalies${q ? '?' + q : ''}`)
 }
 
 // ─── Audit ───

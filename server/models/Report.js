@@ -41,6 +41,18 @@ const reportSchema = new mongoose.Schema({
     aiGeneratedSections: { type: Number },
     wordCount: { type: Number },
   },
+  finalProductSecurity: {
+    sha256Hash: { type: String, default: '' },
+    hashAlgorithm: { type: String, default: 'SHA-256' },
+    format: { type: String, default: '' },
+    classification: { type: String, default: 'Confidential' },
+    watermark: { type: String, default: 'CONFIDENTIAL - FOR AUTHORIZED PERSONNEL ONLY' },
+    version: { type: String, default: '1.0' },
+    immutable: { type: Boolean, default: false },
+    signedBy: { type: String, default: '' },
+    signatureMethod: { type: String, default: '' },
+    securedAt: { type: Date },
+  },
 }, { timestamps: true })
 
 reportSchema.index({ caseId: 1 })

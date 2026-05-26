@@ -679,6 +679,43 @@ export default function CaseDetail() {
           <div className="section-header">
             <div className="section-title">Event Timeline ({timelineData?.totalEvents || 0} events)</div>
           </div>
+          {timelineData?.attackAlerts?.length > 0 && (
+            <div className="glow-card" style={{ marginBottom: 18 }}>
+              <div className="glow-card-inner" style={{ padding: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                  <AlertTriangle size={17} style={{ color: 'var(--accent-danger)' }} />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Correlated Attack Alerts</div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                      Multi-event detections generated from the reconstructed timeline.
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 10 }}>
+                  {timelineData.attackAlerts.slice(0, 6).map(alert => {
+                    const sevColors = {
+                      critical: { bg: 'rgba(255,82,82,0.1)', text: '#ff5252', border: 'rgba(255,82,82,0.25)' },
+                      danger: { bg: 'rgba(255,82,82,0.07)', text: 'var(--accent-danger)', border: 'rgba(255,82,82,0.18)' },
+                      warning: { bg: 'rgba(255,171,64,0.07)', text: 'var(--accent-warning)', border: 'rgba(255,171,64,0.18)' },
+                    }
+                    const colors = sevColors[alert.severity] || sevColors.warning
+                    return (
+                      <div key={alert.id} style={{ border: `1px solid ${colors.border}`, background: colors.bg, borderRadius: 'var(--radius-sm)', padding: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
+                          <strong style={{ fontSize: '0.84rem' }}>{alert.title}</strong>
+                          <span style={{ color: colors.text, fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}>{alert.riskScore}</span>
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>{alert.description}</div>
+                        <div style={{ marginTop: 8, fontSize: '0.7rem', color: colors.text, fontFamily: 'var(--font-mono)' }}>
+                          {alert.mitreAttack?.techniqueId || alert.ruleId} · {alert.eventCount} events
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
           {!timelineData || !timelineData.dateGroups || timelineData.dateGroups.length === 0 ? (
             <div className="empty-state" style={{ padding: '40px 20px' }}>
               <div className="empty-state-icon"><Clock size={32} /></div>

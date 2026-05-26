@@ -3,6 +3,7 @@ import Evidence from '../models/Evidence.js'
 import Case from '../models/Case.js'
 import User from '../models/User.js'
 import { buildTimeline } from '../utils/parser.js'
+import { detectAttackAlerts } from '../analysis/correlationEngine.js'
 import { optionalAuth } from '../middleware/auth.js'
 
 const router = express.Router()
@@ -92,6 +93,8 @@ router.get('/:caseId', optionalAuth, async (req, res, next) => {
       grouped[dateKey].push(event)
     }
 
+    const attackAlerts = detectAttackAlerts(timeline.events)
+
     res.json({
       totalEvents: timeline.events.length,
       dateGroups: Object.entries(grouped).map(([date, events]) => ({
@@ -105,6 +108,13 @@ router.get('/:caseId', optionalAuth, async (req, res, next) => {
         danger: timeline.events.filter(e => e.severity === 'danger').length,
         warning: timeline.events.filter(e => e.severity === 'warning').length,
         info: timeline.events.filter(e => e.severity === 'info').length,
+      },
+      attackAlerts,
+      alertCounts: {
+        total: attackAlerts.length,
+        critical: attackAlerts.filter(alert => alert.severity === 'critical').length,
+        danger: attackAlerts.filter(alert => alert.severity === 'danger').length,
+        warning: attackAlerts.filter(alert => alert.severity === 'warning').length,
       },
     })
   } catch (err) {

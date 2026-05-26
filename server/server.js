@@ -18,12 +18,23 @@ import timelineRouter from './routes/timeline.js'
 import auditRouter from './routes/audit.js'
 import dashboardRouter from './routes/dashboard.js'
 import settingsRouter from './routes/settings.js'
+import jobsRouter from './routes/jobs.js'
+import parseRouter from './routes/parse.js'
+import anomaliesRouter from './routes/anomalies.js'
+import { getEvidenceSecurityStatus } from './utils/fileSecurity.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const app = express()
 const PORT = process.env.PORT || 5000
+
+function isUsableApiKey(apiKey) {
+  if (!apiKey) return false
+  const value = String(apiKey).trim()
+  if (!value || value.startsWith('••••')) return false
+  return !/^your[_-]/i.test(value) && !/api[_-]?key[_-]?here/i.test(value)
+}
 
 // Trust proxy for express-rate-limit behind reverse proxy (e.g. Render)
 app.set('trust proxy', 1)
@@ -32,6 +43,14 @@ app.set('trust proxy', 1)
 const uploadDir = process.env.UPLOAD_DIR || './uploads'
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true })
+}
+const evidenceStoreDir = process.env.EVIDENCE_STORE_DIR || './evidence-store'
+if (!fs.existsSync(evidenceStoreDir)) {
+  fs.mkdirSync(evidenceStoreDir, { recursive: true })
+}
+const workingDir = process.env.WORKING_DIR || './tmp/processing'
+if (!fs.existsSync(workingDir)) {
+  fs.mkdirSync(workingDir, { recursive: true })
 }
 
 // ─── Security Middleware ───
@@ -56,7 +75,8 @@ app.use(express.urlencoded({ extended: true }))
 app.use(morgan('dev'))
 
 // ─── Serve uploads as static ───
-app.use('/uploads', express.static(uploadDir))
+// Evidence files are not exposed as public static assets. Access must go
+// through authenticated routes/jobs so artifacts remain auditable.
 
 // ─── API Routes ───
 app.use('/api/auth', authRouter)
@@ -68,6 +88,9 @@ app.use('/api/timeline', timelineRouter)
 app.use('/api/audit', auditRouter)
 app.use('/api/dashboard', dashboardRouter)
 app.use('/api/settings', settingsRouter)
+app.use('/api/jobs', jobsRouter)
+app.use('/api/parse', parseRouter)
+app.use('/api/anomalies', anomaliesRouter)
 
 // ─── Health Check ───
 app.get('/api/health', (req, res) => {
@@ -78,9 +101,14 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     threatIntel: {
-      abuseIpDbConfigured: !!(process.env.ABUSEIPDB_API_KEY && process.env.ABUSEIPDB_API_KEY !== 'your_api_key_here'),
-      virusTotalConfigured: !!(process.env.VIRUSTOTAL_API_KEY && process.env.VIRUSTOTAL_API_KEY !== 'your_api_key_here'),
-    }
+      abuseIpDbConfigured: isUsableApiKey(process.env.ABUSEIPDB_API_KEY),
+      virusTotalConfigured: isUsableApiKey(process.env.VIRUSTOTAL_API_KEY),
+    },
+    jobs: {
+      queueProvider: 'BullMQ',
+      redisConfigured: !!(process.env.REDIS_URL || process.env.REDIS_HOST),
+    },
+    evidenceSecurity: getEvidenceSecurityStatus(),
   })
 })
 

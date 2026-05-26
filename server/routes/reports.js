@@ -1,12 +1,17 @@
 import express from 'express'
 import mongoose from 'mongoose'
 import PDFDocument from 'pdfkit'
+import crypto from 'crypto'
+import fs from 'fs'
+import path from 'path'
 import Report from '../models/Report.js'
 import Case from '../models/Case.js'
 import Evidence from '../models/Evidence.js'
 import User from '../models/User.js'
 import { generateSummary, generateFindings, generateReportSection } from '../services/aiService.js'
 import { buildTimeline } from '../utils/parser.js'
+import { detectAttackAlerts } from '../analysis/correlationEngine.js'
+import { detectEventAnomalies } from '../ml/anomalyDetector.js'
 import { optionalAuth } from '../middleware/auth.js'
 import { logAudit } from '../middleware/audit.js'
 
@@ -127,15 +132,17 @@ router.post('/generate', optionalAuth, async (req, res, next) => {
     // Gather evidence — use .lean() to get plain JS objects (avoids Mongoose subdoc spread issues)
     const evidenceList = await Evidence.find({ caseId, status: { $in: ['verified', 'parsed'] } }).lean()
     const timeline = buildTimeline(evidenceList)
+    const attackAlerts = detectAttackAlerts(timeline.events)
+    const mlResult = await detectEventAnomalies(timeline.events)
 
     // Generate AI sections
     const [summaryResult, findingsResult, recommendationsResult] = await Promise.all([
-      generateSummary({ case: caseDoc.toObject(), evidenceCount: evidenceList.length, timeline: timeline.events.slice(0, 20) }),
+      generateSummary({ case: caseDoc.toObject(), evidenceCount: evidenceList.length, timeline: timeline.events.slice(0, 20), attackAlerts: attackAlerts.slice(0, 10), mlAnomalies: mlResult.mlAnomalies.slice(0, 10) }),
       generateFindings(
-        evidenceList.map(e => ({ name: e.originalName, type: e.metadata?.fileType, parsedEvents: e.parsedData?.events?.length || 0, anomalies: e.parsedData?.anomalies || [] })),
-        timeline
+        evidenceList.map(e => ({ name: e.originalName, type: e.metadata?.fileType, parsedEvents: e.parsedData?.events?.length || 0, anomalies: e.parsedData?.anomalies || [], mlAnomalies: e.parsedData?.mlAnomalies || [] })),
+        { ...timeline, attackAlerts, mlAnomalies: mlResult.mlAnomalies }
       ),
-      generateReportSection('recommendations', { case: caseDoc.toObject(), evidenceCount: evidenceList.length }),
+      generateReportSection('recommendations', { case: caseDoc.toObject(), evidenceCount: evidenceList.length, attackAlerts: attackAlerts.slice(0, 10), mlAnomalies: mlResult.mlAnomalies.slice(0, 10) }),
     ])
 
     // Build evidence inventory section
@@ -161,6 +168,43 @@ router.post('/generate', optionalAuth, async (req, res, next) => {
 | Timestamp | Event Type | Source / Module | Observation |
 |-----------|------------|-----------------|-------------|
 ${timelineRows}`
+    }
+
+    let attackAlertsSection = ''
+    if (attackAlerts.length === 0) {
+      attackAlertsSection = 'No multi-event attack correlations were detected from the available parsed evidence.'
+    } else {
+      const alertRows = attackAlerts.slice(0, 20).map(alert => {
+        const safeTitle = alert.title.replace(/\|/g, ',')
+        const safeDescription = alert.description.replace(/\|/g, ',').replace(/\n/g, ' ')
+        const entities = [
+          alert.entities.users.length ? `Users: ${alert.entities.users.join(', ')}` : '',
+          alert.entities.sourceIps.length ? `Source IPs: ${alert.entities.sourceIps.join(', ')}` : '',
+          alert.entities.hosts.length ? `Hosts: ${alert.entities.hosts.join(', ')}` : '',
+        ].filter(Boolean).join('; ') || 'N/A'
+        return `| ${alert.severity.toUpperCase()} | ${alert.riskScore} | ${safeTitle} | ${alert.mitreAttack.techniqueId} | ${entities.replace(/\|/g, ',')} | ${safeDescription} |`
+      }).join('\n')
+      attackAlertsSection = `The following attack-level alerts were produced by deterministic correlation rules over the reconstructed timeline:
+
+| Severity | Risk | Alert | MITRE | Entities | Correlation Basis |
+|---|---:|---|---|---|---|
+${alertRows}`
+    }
+
+    let mlAnomalySection = ''
+    if (mlResult.mlAnomalies.length === 0) {
+      mlAnomalySection = `Isolation Forest anomaly detection completed with no anomalous events flagged. Model status: ${mlResult.mlSummary.status || 'completed'}.`
+    } else {
+      const anomalyRows = mlResult.mlAnomalies.slice(0, 20).map(item => {
+        const safeDetail = (item.detail || '').replace(/\|/g, ',').replace(/\n/g, ' ')
+        const reasons = (item.reasons || []).join('; ').replace(/\|/g, ',')
+        return `| ${item.timestamp || 'Unknown'} | ${item.mlScore} | ${item.eventType} | ${item.source || 'N/A'} | ${safeDetail} | ${reasons || 'Model outlier'} |`
+      }).join('\n')
+      mlAnomalySection = `Isolation Forest detected ${mlResult.mlAnomalies.length} anomalous event(s) from ${mlResult.mlSummary.totalEvents || timeline.events.length} normalized event(s). These results are unsupervised ML signals and require investigator review.
+
+| Timestamp | ML Score | Event Type | Source | Observation | Model Reasons |
+|---|---:|---|---|---|---|
+${anomalyRows}`
     }
 
     // Aggregate Threat Indicators (IOCs)
@@ -259,9 +303,11 @@ ${mitreRows}`
         { title: 'Evidence Inventory', content: evidenceInventory, order: 2, aiGenerated: false, confidence: 100, status: 'draft' },
         { title: 'Timeline of Events', content: timelineSection || 'No events found. Upload and parse evidence to generate timeline.', order: 3, aiGenerated: true, confidence: 85, status: 'draft' },
         { title: 'Key Findings', content: findingsResult.content, order: 4, aiGenerated: true, confidence: findingsResult.confidence, status: 'needs-review' },
-        { title: 'Threat Indicators (IOCs)', content: iocsSection, order: 5, aiGenerated: true, confidence: 90, status: 'draft' },
-        { title: 'MITRE ATT&CK Matrix', content: mitreSection, order: 6, aiGenerated: true, confidence: 90, status: 'draft' },
-        { title: 'Recommendations', content: recommendationsResult.content, order: 7, aiGenerated: true, confidence: recommendationsResult.confidence, status: 'draft' },
+        { title: 'Correlated Attack Alerts', content: attackAlertsSection, order: 5, aiGenerated: false, confidence: 100, status: attackAlerts.length ? 'needs-review' : 'draft' },
+        { title: 'ML Anomaly Detection', content: mlAnomalySection, order: 6, aiGenerated: false, confidence: 100, status: mlResult.mlAnomalies.length ? 'needs-review' : 'draft' },
+        { title: 'Threat Indicators (IOCs)', content: iocsSection, order: 7, aiGenerated: true, confidence: 90, status: 'draft' },
+        { title: 'MITRE ATT&CK Matrix', content: mitreSection, order: 8, aiGenerated: true, confidence: 90, status: 'draft' },
+        { title: 'Recommendations', content: recommendationsResult.content, order: 9, aiGenerated: true, confidence: recommendationsResult.confidence, status: 'draft' },
       ],
     })
 
@@ -337,11 +383,12 @@ router.get('/:id/export', optionalAuth, async (req, res, next) => {
     if (!report) return res.status(404).json({ error: 'Report not found' })
 
     const doc = new PDFDocument({ size: 'A4', margin: 60 })
-
-    res.setHeader('Content-Type', 'application/pdf')
-    res.setHeader('Content-Disposition', `attachment; filename="${report.reportNumber}.pdf"`)
-
-    doc.pipe(res)
+    const chunks = []
+    const pdfBufferPromise = new Promise((resolve, reject) => {
+      doc.on('data', chunk => chunks.push(chunk))
+      doc.on('end', () => resolve(Buffer.concat(chunks)))
+      doc.on('error', reject)
+    })
 
     // Header
     doc.fontSize(10).fillColor('#666')
@@ -405,7 +452,36 @@ router.get('/:id/export', optionalAuth, async (req, res, next) => {
 
     doc.end()
 
-    await logAudit('report_exported', 'report', report._id, `Report ${report.reportNumber} exported as PDF`, req)
+    const pdfBuffer = await pdfBufferPromise
+    const sha256Hash = crypto.createHash('sha256').update(pdfBuffer).digest('hex')
+    const exportDir = path.resolve(process.env.REPORT_EXPORT_DIR || './tmp/exports')
+    await fs.promises.mkdir(exportDir, { recursive: true })
+    const exportPath = path.join(exportDir, `${report.reportNumber}.pdf`)
+    await fs.promises.writeFile(exportPath, pdfBuffer, { mode: 0o600 })
+
+    const currentSecurity = report.finalProductSecurity?.toObject?.() || report.finalProductSecurity || {}
+    report.exportedAt = new Date()
+    report.exportPath = exportPath
+    report.finalProductSecurity = {
+      ...currentSecurity,
+      sha256Hash,
+      hashAlgorithm: 'SHA-256',
+      format: 'pdf',
+      classification: 'Confidential',
+      watermark: 'CONFIDENTIAL - FOR AUTHORIZED PERSONNEL ONLY',
+      immutable: report.status === 'final',
+      signedBy: report.reviewedByName || req.user?.name || '',
+      signatureMethod: report.status === 'final' ? 'reviewer-attestation' : '',
+      securedAt: new Date(),
+    }
+    await report.save()
+
+    await logAudit('report_exported', 'report', report._id,
+      `Report ${report.reportNumber} exported as PDF (SHA-256: ${sha256Hash.substring(0, 16)}...)`, req)
+
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="${report.reportNumber}.pdf"`)
+    res.send(pdfBuffer)
 
   } catch (err) {
     next(err)

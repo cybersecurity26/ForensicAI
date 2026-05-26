@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+__pycache__/
+*.pyc
 
 # Environment variables
 .env
@@ -12,6 +14,8 @@ client/build/
 
 # Uploaded evidence files (user data — don't commit)
 server/uploads/
+server/evidence-store/
+server/tmp/
 
 # OS files
 .DS_Store
