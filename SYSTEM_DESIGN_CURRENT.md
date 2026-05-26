@@ -119,6 +119,8 @@ Important models:
 
 Actual evidence files are stored outside MongoDB in a filesystem evidence store. The raw file is encrypted using AES-256-GCM before being stored.
 
+Important correction: the current implementation is **not envelope/KMS encryption**. It uses AES-256-GCM with a configured `EVIDENCE_ENCRYPTION_KEY`. In development, the code can fall back to a key derived from `JWT_SECRET` or a development key. It does not currently generate a unique data encryption key per evidence file and then wrap that key with a KMS/master key.
+
 MongoDB keeps only references and metadata, including:
 
 - Storage path.
@@ -245,9 +247,13 @@ Important file:
 
 - `server/analysis/correlationEngine.js`
 
+Important correction: this is timeline construction plus deterministic correlation alerts. The system sorts normalized events by timestamp and detects known patterns. It does not fully infer attacker intent, attacker objective, or final intrusion goal on its own.
+
 ## 7. ML Anomaly Detection Design
 
 The anomaly detection module uses Isolation Forest through Python/scikit-learn.
+
+Important correction: the current ML model compares events within the current event set. It does not yet compare against a stored 1-day, 1-week, or long-term historical baseline of normal activity.
 
 The ML system looks at features such as:
 
@@ -285,6 +291,10 @@ Report sections currently include:
 
 The report export process generates PDF output and stores export metadata, including the generated file hash.
 
+Important correction: backend report export supports final PDF hashing and export metadata, but the current report detail frontend can still export through a browser print window. That frontend path can bypass the backend export route unless the UI is wired to call `/api/reports/:id/export`.
+
+Legal and corporate report samples exist for reference, and report prompts use neutral forensic wording. However, the current app does not yet expose selectable "legal" versus "corporate" report profiles or separate rulesets in the UI. Reports use a fixed section structure.
+
 Important files:
 
 - `server/routes/reports.js`
@@ -320,6 +330,8 @@ AI-assisted processing:
 - Case-chat assistance.
 
 This boundary keeps the system cheaper, more auditable, and more suitable for forensic work.
+
+Important correction: AI is not used for core forensic detection. Parsing, timeline building, MITRE mapping, risk scoring, correlation, and ML anomaly detection are code-based. AI is used mainly for drafting summaries, findings, recommendations, and case-chat responses.
 
 ## 10. Deployment Design
 
@@ -361,6 +373,7 @@ Security features currently implemented:
 
 - SHA-256 hash generation for evidence integrity.
 - AES-256-GCM encryption for stored evidence files.
+- Configured-key encryption, not true envelope/KMS encryption.
 - Evidence metadata stored separately from encrypted evidence bytes.
 - Controlled temporary plaintext extraction only during parsing.
 - Cleanup of temporary parser files.

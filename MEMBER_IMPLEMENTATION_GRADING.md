@@ -185,6 +185,11 @@ The anomaly endpoint returned completed Isolation Forest output for the demo cas
 - 4 ML anomalies detected.
 - 8 correlated attack alerts available alongside anomaly results.
 
+Important correction:
+
+- The model detects outliers inside the current event set.
+- It does not yet compare against a stored historical baseline such as a previous day, week, or month of normal activity.
+
 Final assessment:
 
 Member 4 work is fully implemented and integrated with backend, frontend, and reporting.
@@ -230,7 +235,7 @@ Original responsibility:
 - Create final forensic PDF report.
 - Build full upload -> analysis -> report generation pipeline.
 
-Current status: **A / Complete**
+Current status: **A- / Mostly Complete**
 
 Implemented work:
 
@@ -264,9 +269,14 @@ Implemented work:
 - Legal-context sample report added.
 - Corporate-context sample report added.
 
+Important corrections:
+
+- Backend PDF export hashing exists, but the report detail frontend still has a browser print-window export path that can bypass the backend hash/export metadata route.
+- Legal and corporate sample reports exist, and prompts use neutral forensic wording, but the app does not yet provide selectable legal/corporate report profiles or separate report rulesets.
+
 Final assessment:
 
-Member 6 work is fully complete for the required project workflow.
+Member 6 work is complete for the main upload-to-report workflow, but final report security and legal/corporate positioning still need frontend/profile refinement for a stricter production interpretation.
 
 ## Overall Member-Wise Summary
 
@@ -277,7 +287,7 @@ Member 6 work is fully complete for the required project workflow.
 | Member 3 | Detection Engineer | A | MITRE mapping, risk scoring, and correlation engine complete. |
 | Member 4 | ML Engineer | A | Isolation Forest anomaly detection complete and integrated. |
 | Member 5 | Frontend Engineer | A- | Required UI complete; future UI polish/testing possible. |
-| Member 6 | Report and Integration Engineer | A | End-to-end analysis and reporting pipeline complete. |
+| Member 6 | Report and Integration Engineer | A- | End-to-end analysis/reporting pipeline complete; backend PDF hashing exists, but frontend export wiring and legal/corporate profiles need refinement. |
 
 ## Extra Updates
 
@@ -286,6 +296,7 @@ These features were implemented even though they were not strictly required in t
 ### Evidence Security
 
 - AES-256-GCM encryption for stored evidence.
+- Current encryption uses a configured evidence key; it is not true envelope/KMS encryption yet.
 - Separate secure evidence storage outside MongoDB.
 - Controlled temporary plaintext access only during parsing.
 - Temporary parser file cleanup.
@@ -334,8 +345,10 @@ These features were implemented even though they were not strictly required in t
 - Reports now include deterministic detection results, not only AI-written sections.
 - Reports include ML anomaly findings.
 - Reports include correlated attack alerts.
-- PDF export metadata and hash support added.
+- Backend PDF export metadata and hash support added.
+- Frontend report detail export still needs to call the backend export route to guarantee final product hash metadata is recorded.
 - Legal and corporate sample reports added for presentation context.
+- Selectable legal/corporate report profiles are not implemented yet.
 
 ### Frontend Improvements
 
@@ -356,6 +369,6 @@ These features were implemented even though they were not strictly required in t
 
 The current project is complete for academic submission and project expo demonstration. It now shows a professional end-to-end forensic workflow:
 
-Case Management -> Evidence Upload -> Hashing -> Secure Storage -> Job Queue -> Parsing -> Normalization -> MITRE Mapping -> Risk Scoring -> Correlation -> ML Anomaly Detection -> Timeline -> Dashboard -> Report Generation -> PDF Export
+Case Management -> Evidence Upload -> Hashing -> Secure Storage -> Job Queue -> Parsing -> Normalization -> MITRE Mapping -> Risk Scoring -> Correlation -> ML Anomaly Detection -> Timeline -> Dashboard -> Report Generation -> Backend PDF Export
 
-The only remaining improvements are production-level extensions such as public cloud hosting, more forensic artifact formats, larger rule libraries, automated UI tests, and formal key rotation workflows.
+The remaining improvements are production-level extensions such as public cloud hosting, more forensic artifact formats, larger rule libraries, automated UI tests, formal key rotation/envelope encryption, stored historical anomaly baselines, selectable report profiles, and frontend wiring to the backend hashed PDF export route.
