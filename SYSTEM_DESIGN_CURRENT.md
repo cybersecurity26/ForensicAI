@@ -6,6 +6,8 @@ The Automated Digital Forensics Reporting Tool is a full-stack forensic investig
 
 The current system is designed so expensive AI usage is limited to report writing and case-chat style assistance. Core forensic work such as parsing, hashing, normalization, MITRE mapping, risk scoring, timeline construction, and anomaly detection is handled through deterministic code and Python-based parsers.
 
+For correction notes and exact current limitations, see `IMPLEMENTATION_CORRECTIONS.md`.
+
 ## 2. High-Level Architecture
 
 ```mermaid

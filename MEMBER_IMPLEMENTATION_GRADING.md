@@ -11,6 +11,8 @@ Latest pushed implementation commit:
 
 This document grades the newly implemented and pushed work according to the Member 1 to Member 6 responsibility structure, then lists extra updates implemented beyond the original member checklist.
 
+For the detailed correction notes behind the final grades, see `IMPLEMENTATION_CORRECTIONS.md`.
+
 ## Grading Scale
 
 | Grade | Meaning |
