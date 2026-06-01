@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Upload, FileText, Hash, CheckCircle, AlertTriangle,
-  X, File, HardDrive, Shield, Copy, Clock, Loader
+  X, File, HardDrive, Shield, Copy, Clock, Loader, RefreshCw
 } from 'lucide-react'
 import { getCases, uploadEvidence } from '../api'
+
+const BASE = import.meta.env.VITE_API_URL || '/api'
 
 const allowedTypes = [
   { ext: '.log', label: 'System Logs', icon: '📋' },
@@ -31,7 +33,10 @@ export default function EvidenceUpload() {
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState(null)
+  const [uploadedEvidence, setUploadedEvidence] = useState([]) // persisted list from server
+  const [loadingEvidence, setLoadingEvidence] = useState(false)
 
+  // Fetch cases on mount
   useEffect(() => {
     getCases({ limit: 50 }).then(data => {
       const c = data.cases || []
@@ -39,6 +44,28 @@ export default function EvidenceUpload() {
       if (c.length > 0) setSelectedCaseId(c[0]._id)
     }).catch(() => {})
   }, [])
+
+  // Fetch uploaded evidence for selected case (persists across refresh)
+  const fetchCaseEvidence = useCallback(async (caseId) => {
+    if (!caseId) { setUploadedEvidence([]); return }
+    setLoadingEvidence(true)
+    try {
+      const token = localStorage.getItem('forensic_token') || ''
+      const res = await fetch(`${BASE}/evidence?caseId=${caseId}&limit=50`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setUploadedEvidence(data.evidence || data.items || [])
+      }
+    } catch (e) {
+      setUploadedEvidence([])
+    } finally {
+      setLoadingEvidence(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchCaseEvidence(selectedCaseId) }, [selectedCaseId, fetchCaseEvidence])
 
   const handleFileSelect = (e) => {
     processFiles([...e.target.files])
@@ -104,8 +131,10 @@ export default function EvidenceUpload() {
     try {
       const rawFiles = files.map(f => f.file)
       const result = await uploadEvidence(selectedCaseId, rawFiles)
-      setUploadResult({ success: true, message: result.message })
+      setUploadResult({ success: true, message: result.message || `${files.length} file(s) uploaded successfully` })
       setFiles([])
+      // Re-fetch the server's evidence list so it persists across refresh
+      await fetchCaseEvidence(selectedCaseId)
     } catch (err) {
       setUploadResult({ success: false, message: err.message })
     } finally {
@@ -163,7 +192,7 @@ export default function EvidenceUpload() {
           border: dragOver ? '2px dashed var(--accent-primary)' : '2px dashed var(--border-primary)',
           borderRadius: 'var(--radius-md)',
           transition: 'all 0.2s',
-          background: dragOver ? 'rgba(0, 212, 255, 0.04)' : 'transparent',
+          background: dragOver ? 'rgba(99, 102, 241, 0.06)' : 'transparent',
         }}>
           <Upload size={40} style={{ color: 'var(--accent-primary)', marginBottom: 12 }} />
           <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 6 }}>
@@ -225,7 +254,7 @@ export default function EvidenceUpload() {
             }}>
               <div style={{
                 width: 40, height: 40, borderRadius: 'var(--radius-sm)',
-                background: 'rgba(0, 212, 255, 0.08)',
+                background: 'rgba(99, 102, 241, 0.1)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <File size={18} style={{ color: 'var(--accent-primary)' }} />
@@ -279,6 +308,97 @@ export default function EvidenceUpload() {
           </button>
         </div>
       )}
+
+      {/* ── Persisted Evidence (from server — survives refresh) ── */}
+      {selectedCaseId && (
+        <div style={{ marginTop: 36 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                Uploaded Evidence
+              </div>
+              <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                Files linked to this case — persisted in the database
+              </div>
+            </div>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => fetchCaseEvidence(selectedCaseId)}
+              disabled={loadingEvidence}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <RefreshCw size={13} style={loadingEvidence ? { animation: 'spin 1s linear infinite' } : {}} />
+              Refresh
+            </button>
+          </div>
+
+          {loadingEvidence ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              <Loader size={15} style={{ animation: 'spin 1s linear infinite' }} /> Loading evidence...
+            </div>
+          ) : uploadedEvidence.length === 0 ? (
+            <div style={{
+              padding: '32px 20px', textAlign: 'center',
+              background: 'var(--bg-card)', border: '1px solid var(--border-primary)',
+              borderRadius: 'var(--radius-lg)',
+              color: 'var(--text-muted)', fontSize: '0.84rem',
+            }}>
+              <File size={28} style={{ opacity: 0.3, marginBottom: 10 }} />
+              <div>No evidence uploaded for this case yet.</div>
+              <div style={{ fontSize: '0.76rem', marginTop: 4 }}>Upload files above to get started.</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {uploadedEvidence.map((ev) => (
+                <motion.div
+                  key={ev._id || ev.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 14,
+                    padding: '13px 18px',
+                    background: 'var(--bg-card)', border: '1px solid var(--border-primary)',
+                    borderRadius: 'var(--radius-md)', transition: 'border-color 0.2s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(99,102,241,0.25)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-primary)'}
+                >
+                  <div style={{
+                    width: 38, height: 38, borderRadius: 'var(--radius-sm)',
+                    background: 'rgba(99,102,241,0.1)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    <File size={17} style={{ color: 'var(--accent-primary)' }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.87rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {ev.originalName || ev.filename || ev.name || 'Unknown file'}
+                    </div>
+                    <div style={{ display: 'flex', gap: 14, fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                      {ev.size && <span><HardDrive size={10} style={{ marginRight: 3 }} />{formatSize(ev.size)}</span>}
+                      {ev.sha256 && (
+                        <span style={{ fontFamily: 'var(--font-mono)' }}>
+                          <Hash size={10} style={{ marginRight: 3 }} />{ev.sha256.substring(0, 14)}...
+                        </span>
+                      )}
+                      {ev.createdAt && <span><Clock size={10} style={{ marginRight: 3 }} />{new Date(ev.createdAt).toLocaleDateString()}</span>}
+                    </div>
+                  </div>
+                  <div style={{
+                    padding: '3px 9px', borderRadius: 'var(--radius-sm)',
+                    background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.18)',
+                    color: 'var(--accent-success)', fontSize: '0.7rem', fontWeight: 600, flexShrink: 0,
+                  }}>
+                    <Shield size={10} style={{ marginRight: 3 }} />
+                    {ev.status === 'parsed' ? 'Parsed' : ev.status === 'uploaded' ? 'Uploaded' : 'Stored'}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </motion.div>
   )
 }
+

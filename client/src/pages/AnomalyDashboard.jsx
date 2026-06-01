@@ -17,7 +17,7 @@ import { getAnomalies, getCases } from '../api'
 const scorePalette = {
   critical: { label: 'Critical', color: '#ff5252', bg: 'rgba(255, 82, 82, 0.1)', border: 'rgba(255, 82, 82, 0.28)' },
   high: { label: 'High', color: '#ffab40', bg: 'rgba(255, 171, 64, 0.1)', border: 'rgba(255, 171, 64, 0.25)' },
-  medium: { label: 'Medium', color: '#00d4ff', bg: 'rgba(0, 212, 255, 0.08)', border: 'rgba(0, 212, 255, 0.22)' },
+  medium: { label: 'Medium', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.08)', border: 'rgba(99, 102, 241, 0.25)' },
   low: { label: 'Low', color: '#00e676', bg: 'rgba(0, 230, 118, 0.08)', border: 'rgba(0, 230, 118, 0.2)' },
 }
 

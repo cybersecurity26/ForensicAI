@@ -315,11 +315,11 @@ export default function Dashboard() {
         }}
         onMouseEnter={e => {
           e.currentTarget.style.transform = 'scale(1.08)'
-          e.currentTarget.style.boxShadow = '0 6px 24px rgba(0, 212, 255, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3)'
+          e.currentTarget.style.boxShadow = '0 6px 24px rgba(99, 102, 241, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3)'
         }}
         onMouseLeave={e => {
           e.currentTarget.style.transform = 'scale(1)'
-          e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 212, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+          e.currentTarget.style.boxShadow = '0 4px 20px rgba(99, 102, 241, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
         }}
         title="Query Case AI Copilot"
       >

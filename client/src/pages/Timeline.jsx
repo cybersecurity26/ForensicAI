@@ -11,7 +11,7 @@ const typeColors = {
   danger: { bg: 'rgba(255, 82, 82, 0.08)', text: 'var(--accent-danger)', border: 'rgba(255, 82, 82, 0.2)' },
   warning: { bg: 'rgba(255, 171, 64, 0.08)', text: 'var(--accent-warning)', border: 'rgba(255, 171, 64, 0.2)' },
   success: { bg: 'rgba(0, 230, 118, 0.08)', text: 'var(--accent-success)', border: 'rgba(0, 230, 118, 0.2)' },
-  info: { bg: 'rgba(0, 212, 255, 0.08)', text: 'var(--accent-primary)', border: 'rgba(0, 212, 255, 0.2)' },
+  info: { bg: 'rgba(99, 102, 241, 0.08)', text: 'var(--accent-primary)', border: 'rgba(99, 102, 241, 0.2)' },
   critical: { bg: 'rgba(255, 82, 82, 0.12)', text: '#ff5252', border: 'rgba(255, 82, 82, 0.3)' },
 }
 
