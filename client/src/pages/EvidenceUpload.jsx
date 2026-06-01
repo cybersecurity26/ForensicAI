@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import {
   Upload, FileText, Hash, CheckCircle, AlertTriangle,
-  X, File, HardDrive, Shield, Copy, Clock, Loader, RefreshCw
+  X, File, HardDrive, Shield, Copy, Clock, Loader, RefreshCw,
+  FolderOpen, Plus, ArrowRight
 } from 'lucide-react'
 import { getCases, uploadEvidence } from '../api'
 
@@ -33,8 +35,9 @@ export default function EvidenceUpload() {
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState(null)
-  const [uploadedEvidence, setUploadedEvidence] = useState([]) // persisted list from server
+  const [uploadedEvidence, setUploadedEvidence] = useState([])
   const [loadingEvidence, setLoadingEvidence] = useState(false)
+  const [loading, setLoading] = useState(true) // cases loading
 
   // Fetch cases on mount
   useEffect(() => {
@@ -42,7 +45,7 @@ export default function EvidenceUpload() {
       const c = data.cases || []
       setCases(c)
       if (c.length > 0) setSelectedCaseId(c[0]._id)
-    }).catch(() => {})
+    }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
   // Fetch uploaded evidence for selected case (persists across refresh)
@@ -136,15 +139,28 @@ export default function EvidenceUpload() {
     setUploading(true)
     setUploadResult(null)
 
+    // ── Optimistic UI: add files to the displayed list immediately ──
+    const optimisticItems = files.map(f => ({
+      _id: `optimistic-${f.id}`,
+      originalName: f.name,
+      size: f.size,
+      sha256: f.hash,
+      status: 'uploading',
+      createdAt: new Date().toISOString(),
+    }))
+    setUploadedEvidence(prev => [...optimisticItems, ...prev])
+
     try {
       const rawFiles = files.map(f => f.file)
       const result = await uploadEvidence(selectedCaseId, rawFiles)
       setUploadResult({ success: true, message: result.message || `${files.length} file(s) uploaded successfully` })
       setFiles([])
-      // Re-fetch the server's evidence list so it persists across refresh
+      // Replace optimistic items with real server data
       await fetchCaseEvidence(selectedCaseId)
     } catch (err) {
-      setUploadResult({ success: false, message: err.message })
+      // Remove optimistic items on failure
+      setUploadedEvidence(prev => prev.filter(e => !e._id?.startsWith('optimistic-')))
+      setUploadResult({ success: false, message: err.message || 'Upload failed. Please try again.' })
     } finally {
       setUploading(false)
     }
@@ -167,6 +183,31 @@ export default function EvidenceUpload() {
         </p>
       </div>
 
+      {/* No cases banner */}
+      {!loading && cases.length === 0 && (
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} style={{
+          background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.25)',
+          borderRadius: 12, padding: '20px 24px', marginBottom: 24,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(99,102,241,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FolderOpen size={20} color="var(--accent-primary)" />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-primary)', marginBottom: 3 }}>No cases found</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>You need to create a case before uploading evidence. Evidence is always linked to a case.</div>
+            </div>
+          </div>
+          <Link to="/cases" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 20px', borderRadius: 9, background: 'var(--gradient-primary)', color: 'white', textDecoration: 'none', fontWeight: 700, fontSize: '0.84rem', fontFamily: 'var(--font-display)', boxShadow: '0 4px 16px rgba(99,102,241,0.35)', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(99,102,241,0.5)' }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(99,102,241,0.35)' }}
+          >
+            <Plus size={14} /> Create a Case <ArrowRight size={13} />
+          </Link>
+        </motion.div>
+      )}
+
       {/* Case selector */}
       <div style={{ marginBottom: 20 }}>
         <label style={{ display: 'block', fontSize: '0.83rem', fontWeight: 600, marginBottom: 6 }}>Select Case *</label>
@@ -177,7 +218,7 @@ export default function EvidenceUpload() {
             padding: '10px 14px', borderRadius: 'var(--radius-sm)',
             background: 'var(--bg-input)', border: '1px solid var(--border-primary)',
             color: 'var(--text-primary)', fontSize: '0.85rem', fontFamily: 'var(--font-primary)',
-            minWidth: 350,
+            minWidth: 350, outline: 'none',
           }}
         >
           <option value="">— Choose a case —</option>
@@ -185,6 +226,11 @@ export default function EvidenceUpload() {
             <option key={c._id} value={c._id}>{c.caseNumber} — {c.title}</option>
           ))}
         </select>
+        {cases.length > 0 && !selectedCaseId && (
+          <div style={{ fontSize: '0.76rem', color: 'var(--accent-warning)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <AlertTriangle size={11} /> Select a case above before uploading files
+          </div>
+        )}
       </div>
 
       {/* Drop Zone */}

@@ -33,14 +33,12 @@ const SUGGESTIONS = [
 ]
 
 /* ─── AI Models ─── */
-const AI_MODELS = ['GPT-4o', 'GPT-4-1 Mini', 'Gemini 2.5 Flash', 'Claude 3.5 Sonnet']
-
-const MODEL_COLORS = {
-  'GPT-4o': '#10a37f',
-  'GPT-4-1 Mini': '#10a37f',
-  'Gemini 2.5 Flash': '#4285f4',
-  'Claude 3.5 Sonnet': '#c96442',
-}
+const AI_MODELS = [
+  { id: 'mistral', label: 'Mistral (Active)', available: true, color: '#f59e0b', desc: 'Core forensic AI engine' },
+  { id: 'gpt4o', label: 'GPT-4o', available: false, color: '#10a37f', desc: 'Requires OpenAI API key' },
+  { id: 'gemini', label: 'Gemini 2.5 Flash', available: false, color: '#4285f4', desc: 'Requires Google API key' },
+  { id: 'claude', label: 'Claude 3.5 Sonnet', available: false, color: '#c96442', desc: 'Requires Anthropic API key' },
+]
 
 /* ─── Message bubble ─── */
 function ChatBubble({ msg, onSourceClick }) {
@@ -194,7 +192,7 @@ export default function CaseChat() {
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const [selectedSources, setSelectedSources] = useState(null)
-  const [selectedModel, setSelectedModel] = useState('GPT-4o')
+  const [selectedModel, setSelectedModel] = useState('mistral')
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
   const messagesEndRef = useRef(null)
   const { ref: textareaRef, adjust } = useAutoResize({ minHeight: 56, maxHeight: 260 })
@@ -307,45 +305,62 @@ export default function CaseChat() {
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-primary)', borderRadius: 12, padding: '16px' }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>AI Model</div>
             <div style={{ position: 'relative' }}>
-              <button
-                onClick={() => setModelMenuOpen(o => !o)}
-                style={{
-                  width: '100%', padding: '9px 12px', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  background: 'var(--bg-input)', border: '1px solid var(--border-primary)',
-                  color: 'var(--text-primary)', fontSize: '0.84rem', cursor: 'pointer', fontFamily: 'var(--font-primary)',
-                  transition: 'border-color 0.2s',
-                }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)'}
-                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-primary)'}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: MODEL_COLORS[selectedModel] || '#6366f1' }} />
-                  {selectedModel}
-                </div>
-                <ChevronDown size={14} style={{ color: 'var(--text-muted)', transition: 'transform 0.2s', transform: modelMenuOpen ? 'rotate(180deg)' : 'none' }} />
-              </button>
+              {/* Trigger button */}
+              {(() => {
+                const activeM = AI_MODELS.find(m => m.id === selectedModel) || AI_MODELS[0]
+                return (
+                  <button
+                    onClick={() => setModelMenuOpen(o => !o)}
+                    style={{
+                      width: '100%', padding: '9px 12px', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      background: 'var(--bg-input)', border: '1px solid var(--border-primary)',
+                      color: 'var(--text-primary)', fontSize: '0.84rem', cursor: 'pointer', fontFamily: 'var(--font-primary)',
+                      transition: 'border-color 0.2s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)'}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-primary)'}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: activeM.color }} />
+                      <span>{activeM.label}</span>
+                    </div>
+                    <ChevronDown size={14} style={{ color: 'var(--text-muted)', transition: 'transform 0.2s', transform: modelMenuOpen ? 'rotate(180deg)' : 'none' }} />
+                  </button>
+                )
+              })()}
               <AnimatePresence>
                 {modelMenuOpen && (
                   <motion.div initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={{ duration: 0.18 }}
                     style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: 'var(--bg-card)', border: '1px solid var(--border-primary)', borderRadius: 10, overflow: 'hidden', zIndex: 50, boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}>
                     {AI_MODELS.map(m => (
-                      <button key={m} onClick={() => { setSelectedModel(m); setModelMenuOpen(false) }}
+                      <button key={m.id}
+                        onClick={() => { if (m.available) { setSelectedModel(m.id); setModelMenuOpen(false) } }}
                         style={{
                           width: '100%', padding: '9px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.83rem',
-                          color: selectedModel === m ? 'var(--text-primary)' : 'var(--text-secondary)',
+                          background: 'none', border: 'none',
+                          cursor: m.available ? 'pointer' : 'not-allowed',
+                          fontSize: '0.83rem', opacity: m.available ? 1 : 0.45,
+                          color: selectedModel === m.id ? 'var(--text-primary)' : 'var(--text-secondary)',
                           fontFamily: 'var(--font-primary)', transition: 'background 0.15s',
                         }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.08)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                        onMouseEnter={e => { if (m.available) e.currentTarget.style.background = 'rgba(99,102,241,0.08)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ width: 7, height: 7, borderRadius: '50%', background: MODEL_COLORS[m] || '#6366f1' }} />
-                          {m}
+                          <div style={{ width: 7, height: 7, borderRadius: '50%', background: m.color }} />
+                          <span>{m.label}</span>
+                          {!m.available && (
+                            <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                              Unavailable
+                            </span>
+                          )}
                         </div>
-                        {selectedModel === m && <Check size={13} style={{ color: 'var(--accent-primary)' }} />}
+                        {selectedModel === m.id && <Check size={13} style={{ color: 'var(--accent-primary)' }} />}
                       </button>
                     ))}
+                    <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border-primary)', fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                      Only Mistral is active. Other models require additional API keys.
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -470,10 +485,15 @@ export default function CaseChat() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 6px 2px 6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {/* Model indicator */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: MODEL_COLORS[selectedModel] || '#6366f1' }} />
-                    {selectedModel}
-                  </div>
+                  {(() => {
+                    const m = AI_MODELS.find(x => x.id === selectedModel) || AI_MODELS[0]
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: m.color }} />
+                        {m.label}
+                      </div>
+                    )
+                  })()}
 
                   {/* Divider */}
                   <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
