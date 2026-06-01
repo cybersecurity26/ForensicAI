@@ -54,11 +54,19 @@ export default function EvidenceUpload() {
       const res = await fetch(`${BASE}/evidence?caseId=${caseId}&limit=50`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      if (res.ok) {
-        const data = await res.json()
-        setUploadedEvidence(data.evidence || data.items || [])
+      // Silently ignore if endpoint doesn't exist on this deployment
+      if (res.status === 404 || res.status === 405) {
+        setUploadedEvidence([])
+        return
       }
-    } catch (e) {
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setUploadedEvidence(data.evidence || data.items || data.results || [])
+      } else {
+        setUploadedEvidence([])
+      }
+    } catch {
+      // Network error or endpoint missing — fail silently
       setUploadedEvidence([])
     } finally {
       setLoadingEvidence(false)
