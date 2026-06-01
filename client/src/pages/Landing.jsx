@@ -1,15 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import {
   Shield, Zap, FileText, Clock, Activity, Brain,
   ArrowRight, ChevronDown, Globe, Lock, Star,
-  Check, Search, Upload, MessageSquare, Terminal
+  Check, Search, Upload, MessageSquare, MoveRight
 } from 'lucide-react'
 
-/* ── WebGL-like canvas particle field ── */
+/* ══════════════════════════════════════════════
+   PARTICLE CANVAS
+══════════════════════════════════════════════ */
 function ParticleCanvas() {
   const canvasRef = useRef(null)
   useEffect(() => {
@@ -19,12 +21,10 @@ function ParticleCanvas() {
     let animId
     let w = canvas.width = canvas.offsetWidth
     let h = canvas.height = canvas.offsetHeight
-    const NUM = 90
-    const particles = Array.from({ length: NUM }, () => ({
+    const particles = Array.from({ length: 80 }, () => ({
       x: Math.random() * w, y: Math.random() * h,
-      vx: (Math.random() - 0.5) * 0.35, vy: (Math.random() - 0.5) * 0.35,
-      r: Math.random() * 1.5 + 0.4,
-      a: Math.random(),
+      vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 1.4 + 0.4, a: Math.random() * 0.5 + 0.1,
     }))
     const draw = () => {
       ctx.clearRect(0, 0, w, h)
@@ -34,21 +34,20 @@ function ParticleCanvas() {
         if (p.y < 0) p.y = h; if (p.y > h) p.y = 0
         ctx.beginPath()
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(99,102,241,${p.a * 0.6})`
+        ctx.fillStyle = `rgba(99,102,241,${p.a})`
         ctx.fill()
       })
-      // Draw connecting lines for nearby particles
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x
           const dy = particles[i].y - particles[j].y
-          const dist = Math.sqrt(dx * dx + dy * dy)
-          if (dist < 100) {
+          const d = Math.sqrt(dx * dx + dy * dy)
+          if (d < 110) {
             ctx.beginPath()
             ctx.moveTo(particles[i].x, particles[i].y)
             ctx.lineTo(particles[j].x, particles[j].y)
-            ctx.strokeStyle = `rgba(99,102,241,${(1 - dist / 100) * 0.12})`
-            ctx.lineWidth = 0.6
+            ctx.strokeStyle = `rgba(99,102,241,${(1 - d / 110) * 0.1})`
+            ctx.lineWidth = 0.5
             ctx.stroke()
           }
         }
@@ -56,201 +55,220 @@ function ParticleCanvas() {
       animId = requestAnimationFrame(draw)
     }
     draw()
-    const onResize = () => {
-      w = canvas.width = canvas.offsetWidth
-      h = canvas.height = canvas.offsetHeight
-    }
+    const onResize = () => { w = canvas.width = canvas.offsetWidth; h = canvas.height = canvas.offsetHeight }
     window.addEventListener('resize', onResize)
     return () => { cancelAnimationFrame(animId); window.removeEventListener('resize', onResize) }
   }, [])
   return <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
 }
 
-/* ── MacBook 3D flip + screen typewriter ── */
-function MacBookHero() {
-  const [phase, setPhase] = useState('closed') // closed → opening → open → typed
-  const [typed, setTyped] = useState('')
-  const SCREEN_TEXT = 'ForensicAI'
-  const [showCursor, setShowCursor] = useState(true)
-
-  useEffect(() => {
-    // Sequence: wait → open → type
-    const t1 = setTimeout(() => setPhase('opening'), 600)
-    const t2 = setTimeout(() => setPhase('open'), 2200)
-    let charIdx = 0
-    const t3 = setTimeout(() => {
-      const interval = setInterval(() => {
-        charIdx++
-        setTyped(SCREEN_TEXT.slice(0, charIdx))
-        if (charIdx >= SCREEN_TEXT.length) {
-          clearInterval(interval)
-          setPhase('typed')
-        }
-      }, 95)
-      return () => clearInterval(interval)
-    }, 2600)
-    // Cursor blink
-    const cursorInterval = setInterval(() => setShowCursor(c => !c), 530)
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearInterval(cursorInterval) }
-  }, [])
-
-  const lidAngle = phase === 'closed' ? -90 : phase === 'opening' ? -15 : 0
+/* ══════════════════════════════════════════════
+   MACBOOK 3D COMPONENT (exact reference impl)
+══════════════════════════════════════════════ */
+function MacBook3D() {
+  const keyClass = 'macbook-key mb-anim-keys'
+  const keyBase = {
+    width: 6, height: 6, background: '#444', float: 'left',
+    margin: 1, borderRadius: 2, boxShadow: '0 -2px 0 #222',
+  }
+  const KEY_COUNT = 58
+  const FKEY_COUNT = 16
 
   return (
-    <div style={{ perspective: '900px', perspectiveOrigin: '50% 60%', display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: 320, position: 'relative', zIndex: 2 }}>
-      {/* MacBook wrapper */}
-      <div style={{ position: 'relative', width: 480, height: 'auto' }}>
+    <div className="macbook-container" style={{
+      width: 150, height: 96, position: 'absolute',
+      left: '50%', top: '50%',
+      marginTop: -85, marginLeft: -78,
+    }}>
+      <div className="macbook-inner mb-anim-rotate" style={{
+        zIndex: 20, position: 'absolute', width: 150, height: 96, left: 0, top: 0,
+      }}>
 
-        {/* ── LID (screen half) ── */}
-        <div style={{
-          width: 480, height: 296,
-          transformOrigin: 'bottom center',
-          transform: `rotateX(${lidAngle}deg)`,
-          transition: 'transform 1.6s cubic-bezier(0.34,1.2,0.64,1)',
-          position: 'relative',
-          transformStyle: 'preserve-3d',
+        {/* ── Screen ── */}
+        <div className="macbook-screen mb-anim-lid-screen" style={{
+          width: 150, height: 96, position: 'absolute', left: 0, bottom: 0,
+          borderRadius: 7, background: '#ddd',
+          backgroundImage: 'linear-gradient(45deg,rgba(0,0,0,0.34) 0%,rgba(0,0,0,0) 100%)',
+          backgroundPosition: 'left bottom', backgroundSize: '300px 300px',
+          boxShadow: 'inset 0 3px 7px rgba(255,255,255,0.5)',
         }}>
-          {/* Outer lid — aluminum back */}
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: 'linear-gradient(160deg, #1c1c2e 0%, #0f0f1a 50%, #141428 100%)',
-            borderRadius: '14px 14px 0 0',
-            border: '1px solid rgba(99,102,241,0.18)',
-            boxShadow: phase !== 'closed' ? '0 -20px 80px rgba(99,102,241,0.2), 0 0 0 1px rgba(99,102,241,0.1)' : 'none',
-            transition: 'box-shadow 1s ease 1s',
-          }} />
-
-          {/* Apple-style logo glow on lid back */}
-          <div style={{
-            position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%,-50%)',
-            width: 32, height: 32, borderRadius: 8,
-            background: 'rgba(99,102,241,0.08)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            opacity: phase !== 'closed' ? 0.6 : 0, transition: 'opacity 0.8s ease 1.4s',
+          <div className="macbook-screen-face-one" style={{
+            width: 150, height: 96, position: 'absolute', left: 0, bottom: 0,
+            borderRadius: 7, background: '#d3d3d3',
+            backgroundImage: 'linear-gradient(45deg,rgba(0,0,0,0.24) 0%,rgba(0,0,0,0) 100%)',
           }}>
-            <Shield size={18} color="rgba(99,102,241,0.8)" />
-          </div>
+            {/* Camera */}
+            <div style={{ width: 3, height: 3, borderRadius: '50%', background: 'black', position: 'absolute', left: '50%', top: 4, marginLeft: -1.5 }} />
 
-          {/* Screen bezel */}
-          <div style={{
-            position: 'absolute', inset: 12,
-            background: '#020208',
-            borderRadius: 8, overflow: 'hidden',
-            boxShadow: 'inset 0 0 30px rgba(0,0,0,0.8)',
-          }}>
-            {/* Screen glow */}
+            {/* Screen display */}
             <div style={{
-              position: 'absolute', inset: 0,
-              background: phase === 'open' || phase === 'typed'
-                ? 'radial-gradient(ellipse at 50% 40%, rgba(99,102,241,0.12) 0%, rgba(6,6,8,0.95) 70%)'
-                : 'rgba(2,2,8,1)',
-              transition: 'background 1.2s ease 0.3s',
-            }} />
-
-            {/* Scanlines overlay */}
-            <div style={{
-              position: 'absolute', inset: 0, pointerEvents: 'none',
-              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.08) 3px, rgba(0,0,0,0.08) 4px)',
-              opacity: 0.6,
-            }} />
-
-            {/* Screen content */}
-            <div style={{
-              position: 'relative', zIndex: 2, height: '100%',
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: 10,
-              opacity: phase === 'open' || phase === 'typed' ? 1 : 0,
-              transition: 'opacity 0.6s ease 0.5s',
+              width: 130, height: 74, margin: 10, background: '#000',
+              backgroundSize: '100% 100%', borderRadius: 1, position: 'relative',
+              boxShadow: 'inset 0 0 2px rgba(0,0,0,1)',
             }}>
-              {/* Terminal prompt line */}
-              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.62rem', color: 'rgba(99,102,241,0.5)', letterSpacing: '0.04em', marginBottom: 4 }}>
-                forensic@intelligence:~$
-              </div>
+              <div className="mb-anim-screen-shade" style={{
+                position: 'absolute', left: 0, top: 0, width: 130, height: 74,
+                backgroundImage: 'linear-gradient(-135deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.1) 47%,rgba(255,255,255,0) 48%)',
+                backgroundSize: '300px 200px', backgroundPosition: '0px 0px',
+              }} />
 
-              {/* Main title */}
-              <div style={{
-                fontFamily: 'Sora, sans-serif', fontWeight: 800,
-                fontSize: '2.2rem', letterSpacing: '-0.06em', lineHeight: 1,
-                background: 'linear-gradient(135deg, #f1f0fa, #a78bfa)',
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-              }}>
-                {typed}
-                {phase !== 'typed' && (
-                  <span style={{ WebkitTextFillColor: 'var(--accent-primary)', opacity: showCursor ? 1 : 0, transition: 'opacity 0.1s' }}>_</span>
-                )}
-              </div>
+              {/* "ForensicAI" shiny text ON the screen */}
+              <ShinyScreenText />
+            </div>
 
-              {/* Sub line */}
-              <div style={{
-                fontFamily: 'JetBrains Mono, monospace', fontSize: '0.55rem',
-                color: 'rgba(167,139,250,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase',
-                opacity: phase === 'typed' ? 1 : 0, transition: 'opacity 0.8s ease 0.4s',
-              }}>
-                Digital Forensics Intelligence v2.0
-              </div>
+            {/* MacBook Air label */}
+            <span style={{ position: 'absolute', top: 85, left: 57, fontSize: 6, color: '#666' }}>MacBook Air</span>
+          </div>
+        </div>
 
-              {/* Fake terminal lines */}
-              <div style={{
-                marginTop: 10, display: 'flex', flexDirection: 'column', gap: 3,
-                opacity: phase === 'typed' ? 0.45 : 0, transition: 'opacity 0.8s ease 0.8s',
-              }}>
-                {['Initializing AI engine...', 'Chain-of-custody: ACTIVE', 'Encryption: AES-256'].map((line, i) => (
-                  <div key={i} style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.48rem', color: i === 1 ? '#10b981' : 'rgba(99,102,241,0.6)', letterSpacing: '0.02em' }}>
-                    {'>'} {line}
-                  </div>
-                ))}
-              </div>
+        {/* ── Body ── */}
+        <div className="macbook-body mb-anim-lid-macbody" style={{
+          width: 150, height: 96, position: 'absolute', left: 0, bottom: 0,
+          borderRadius: 7, background: '#cbcbcb',
+          backgroundImage: 'linear-gradient(45deg,rgba(0,0,0,0.24) 0%,rgba(0,0,0,0) 100%)',
+        }}>
+          <div className="macbook-body-face-one mb-anim-lid-keyboard-area" style={{
+            width: 150, height: 96, position: 'absolute', left: 0, bottom: 0,
+            borderRadius: 7, background: '#dfdfdf',
+            backgroundImage: 'linear-gradient(30deg,rgba(0,0,0,0.24) 0%,rgba(0,0,0,0) 100%)',
+          }}>
+            {/* Trackpad */}
+            <div style={{
+              width: 40, height: 31, position: 'absolute', left: '50%', top: '50%',
+              borderRadius: 4, marginTop: -44, marginLeft: -18, background: '#cdcdcd',
+              backgroundImage: 'linear-gradient(30deg,rgba(0,0,0,0.24) 0%,rgba(0,0,0,0) 100%)',
+              boxShadow: 'inset 0 0 3px #888',
+            }} />
+
+            {/* Keyboard */}
+            <div className="macbook-keyboard" style={{
+              width: 130, height: 45, position: 'absolute', left: 7, top: 41,
+              borderRadius: 4, background: '#cdcdcd',
+              backgroundImage: 'linear-gradient(30deg,rgba(0,0,0,0.24) 0%,rgba(0,0,0,0) 100%)',
+              boxShadow: 'inset 0 0 3px #777', paddingLeft: 2, overflow: 'hidden',
+            }}>
+              {Array.from({ length: KEY_COUNT }).map((_, i) => (
+                <div key={`k-${i}`} className={keyClass} style={keyBase} />
+              ))}
+              <div className={keyClass} style={{ ...keyBase, width: 45 }} />
+              {Array.from({ length: FKEY_COUNT }).map((_, i) => (
+                <div key={`f-${i}`} className={keyClass} style={{ ...keyBase, height: 3 }} />
+              ))}
             </div>
           </div>
 
-          {/* Camera dot */}
-          <div style={{ position: 'absolute', top: 7, left: '50%', transform: 'translateX(-50%)', width: 5, height: 5, borderRadius: '50%', background: '#1a1a2e', border: '1px solid rgba(99,102,241,0.2)' }} />
+          {/* Corner screws */}
+          {[{ left: 20, top: 20 }, { right: 20, top: 20 }, { right: 20, bottom: 20 }, { left: 20, bottom: 20 }].map((s, i) => (
+            <div key={i} style={{ width: 5, height: 5, background: '#333', borderRadius: '50%', position: 'absolute', ...s }} />
+          ))}
         </div>
+      </div>
 
-        {/* ── BASE (keyboard half) ── */}
-        <div style={{
-          width: 480, height: 18,
-          background: 'linear-gradient(180deg, #16162a 0%, #0d0d1c 100%)',
-          borderRadius: '0 0 10px 10px',
-          border: '1px solid rgba(99,102,241,0.12)',
-          borderTop: '1px solid rgba(99,102,241,0.06)',
-          position: 'relative',
-        }}>
-          {/* Trackpad reflection */}
-          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 120, height: 8, background: 'rgba(99,102,241,0.04)', borderRadius: 4, border: '1px solid rgba(99,102,241,0.08)' }} />
-        </div>
+      {/* ── Shadow ── */}
+      <div className="macbook-shadow mb-anim-shadow" style={{
+        position: 'absolute', width: 60, height: 0, left: 40, top: 160,
+        boxShadow: '0 0 60px 40px rgba(0,0,0,0.3)',
+      }} />
+    </div>
+  )
+}
 
-        {/* Ground shadow */}
-        <div style={{
-          position: 'absolute', bottom: -20, left: '50%', transform: 'translateX(-50%)',
-          width: phase !== 'closed' ? 420 : 300, height: 16, borderRadius: '50%',
-          background: 'rgba(99,102,241,0.1)',
-          filter: 'blur(12px)',
-          transition: 'width 1.6s ease',
-        }} />
+/* ── Shiny animated text on MacBook screen ── */
+function ShinyScreenText() {
+  return (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+      <motion.div
+        style={{
+          fontFamily: 'Sora, sans-serif', fontWeight: 800, fontSize: 14,
+          letterSpacing: '-0.04em', lineHeight: 1,
+          background: 'linear-gradient(90deg, #6366f1, #a78bfa, #f1f0fa, #a78bfa, #6366f1)',
+          backgroundSize: '200% auto',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+        }}
+        animate={{ backgroundPosition: ['0% 0%', '100% 0%'] }}
+        transition={{ duration: 2.5, repeat: Infinity, repeatType: 'reverse', ease: 'linear' }}
+      >
+        ForensicAI
+      </motion.div>
+      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 4.5, color: 'rgba(99,102,241,0.6)', letterSpacing: '0.04em' }}>
+        v2.0 · Intelligence Platform
       </div>
     </div>
   )
 }
 
-/* ── Feature card ── */
+/* ══════════════════════════════════════════════
+   ANIMATED HERO — rotating words
+══════════════════════════════════════════════ */
+function AnimatedHero() {
+  const [titleNumber, setTitleNumber] = useState(0)
+  const titles = useMemo(() => ['smarter', 'faster', 'accurately', 'precisely', 'fearlessly'], [])
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setTitleNumber(n => (n === titles.length - 1 ? 0 : n + 1))
+    }, 2000)
+    return () => clearTimeout(id)
+  }, [titleNumber, titles])
+
+  return (
+    <div style={{ textAlign: 'center', marginBottom: 36 }}>
+      <h1 style={{
+        fontFamily: 'var(--font-display)', fontWeight: 800,
+        fontSize: 'clamp(2rem, 5vw, 3.6rem)', letterSpacing: '-0.05em',
+        lineHeight: 1.1, color: 'var(--text-primary)', marginBottom: 0,
+      }}>
+        <span style={{ display: 'block', background: 'linear-gradient(135deg, #f1f0fa 30%, var(--accent-secondary))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+          Investigate cases
+        </span>
+        <span style={{ position: 'relative', display: 'flex', width: '100%', justifyContent: 'center', overflow: 'hidden', height: 'clamp(2.4rem,6vw,4.6rem)', alignItems: 'center' }}>
+          &nbsp;
+          {titles.map((title, index) => (
+            <motion.span
+              key={index}
+              style={{
+                position: 'absolute', fontWeight: 800, fontFamily: 'var(--font-display)',
+                background: 'var(--gradient-primary)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+              }}
+              initial={{ opacity: 0, y: -50 }}
+              transition={{ type: 'spring', stiffness: 60 }}
+              animate={
+                titleNumber === index
+                  ? { y: 0, opacity: 1 }
+                  : { y: titleNumber > index ? -80 : 80, opacity: 0 }
+              }
+            >
+              {title}
+            </motion.span>
+          ))}
+        </span>
+      </h1>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════
+   FEATURE CARD
+══════════════════════════════════════════════ */
 function FeatureCard({ icon: Icon, title, desc, accent, delay }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 28 }}
+      initial={{ opacity: 0, y: 24 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      transition={{ duration: 0.55, delay, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.5, delay, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={{ y: -4 }}
       style={{
         background: 'var(--bg-card)', border: '1px solid var(--border-primary)',
         borderRadius: 'var(--radius-xl)', padding: '28px 24px',
-        position: 'relative', overflow: 'hidden', cursor: 'default',
-        transition: 'border-color 0.25s, transform 0.25s, box-shadow 0.25s',
+        position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.25s, border-color 0.25s',
       }}
-      whileHover={{ y: -4, boxShadow: `0 16px 40px ${accent}20`, borderColor: `${accent}40` }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 16px 40px ${accent}20`; e.currentTarget.style.borderColor = `${accent}40` }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'var(--border-primary)' }}
     >
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${accent}, transparent)`, opacity: 0.7 }} />
-      <div style={{ width: 44, height: 44, borderRadius: 11, background: `${accent}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, color: accent, boxShadow: `0 0 20px ${accent}20` }}>
+      <div style={{ width: 44, height: 44, borderRadius: 11, background: `${accent}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, color: accent }}>
         <Icon size={21} />
       </div>
       <div style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>{title}</div>
@@ -259,23 +277,12 @@ function FeatureCard({ icon: Icon, title, desc, accent, delay }) {
   )
 }
 
-/* ── Stat ── */
-function Stat({ value, label }) {
-  return (
-    <motion.div initial={{ opacity: 0, scale: 0.85 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }} style={{ textAlign: 'center' }}>
-      <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.6rem', fontWeight: 800, letterSpacing: '-0.05em', background: 'var(--gradient-primary)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', lineHeight: 1, marginBottom: 6 }}>{value}</div>
-      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>{label}</div>
-    </motion.div>
-  )
-}
-
+/* ══════════════════════════════════════════════
+   MAIN LANDING PAGE
+══════════════════════════════════════════════ */
 export default function LandingPage() {
   const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
-  const heroRef = useRef(null)
-  const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] })
-  const heroY = useTransform(scrollYProgress, [0, 1], [0, 60])
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0])
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -283,16 +290,16 @@ export default function LandingPage() {
   }, [isAuthenticated, navigate])
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20)
-    window.addEventListener('scroll', onScroll)
-    return () => window.removeEventListener('scroll', onScroll)
+    const fn = () => setScrolled(window.scrollY > 20)
+    window.addEventListener('scroll', fn)
+    return () => window.removeEventListener('scroll', fn)
   }, [])
 
   const features = [
     { icon: Shield, title: 'Chain of Custody', desc: 'Cryptographic SHA-256 hashing and immutable audit trails protect every piece of evidence.', accent: '#6366f1', delay: 0 },
-    { icon: Brain, title: 'AI Report Generation', desc: 'GPT-4 powered synthesis drafts forensic narratives, timelines, and executive summaries.', accent: '#a78bfa', delay: 0.08 },
+    { icon: Brain, title: 'AI Report Generation', desc: 'GPT-4 powered synthesis drafts forensic narratives, timelines, and executive summaries in seconds.', accent: '#a78bfa', delay: 0.08 },
     { icon: Clock, title: 'Timeline Reconstruction', desc: 'Correlate logs, disk images, and PCAP captures into a unified chronological timeline.', accent: '#f59e0b', delay: 0.16 },
-    { icon: Activity, title: 'Anomaly Detection', desc: 'ML Isolation Forest surfaces suspicious behavioral patterns in seconds, not hours.', accent: '#10b981', delay: 0.24 },
+    { icon: Activity, title: 'Anomaly Detection', desc: 'ML Isolation Forest surfaces suspicious behavioral patterns across thousands of events instantly.', accent: '#10b981', delay: 0.24 },
     { icon: Globe, title: 'Threat Intelligence', desc: 'Live IOC matching against threat feeds. Link artifacts to known adversary TTPs instantly.', accent: '#f43f5e', delay: 0.32 },
     { icon: MessageSquare, title: 'Case RAG Chat', desc: 'Ask questions about your case in plain English — the AI retrieves from all uploaded evidence.', accent: '#38bdf8', delay: 0.4 },
   ]
@@ -310,8 +317,6 @@ export default function LandingPage() {
         borderBottom: scrolled ? '1px solid var(--border-primary)' : '1px solid transparent',
         transition: 'all 0.3s ease',
       }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, rgba(99,102,241,0.5) 30%, rgba(167,139,250,0.4) 70%, transparent)', opacity: scrolled ? 1 : 0, transition: 'opacity 0.3s' }} />
-
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
           <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(99,102,241,0.4)' }}>
             <Shield size={17} color="white" />
@@ -320,7 +325,6 @@ export default function LandingPage() {
             ForensicAI
           </span>
         </Link>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Link to="/login" style={{ padding: '8px 18px', borderRadius: 8, fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }}
             onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
@@ -333,54 +337,62 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* ── HERO ── */}
-      <section ref={heroRef} style={{ position: 'relative', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', paddingTop: 80 }}>
-
-        {/* Particle WebGL canvas */}
+      {/* ══════════════════════════════════════════════
+          HERO — MacBook 3D + shiny text + rotating words
+      ══════════════════════════════════════════════ */}
+      <section style={{
+        position: 'relative', minHeight: '100vh',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        overflow: 'hidden', paddingTop: 64,
+      }}>
         <ParticleCanvas />
 
-        {/* Background gradient mesh */}
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(99,102,241,0.06) 0%, transparent 70%)' }} />
-        <div style={{ position: 'absolute', top: '15%', left: '8%', width: 320, height: 320, borderRadius: '50%', background: 'rgba(99,102,241,0.07)', filter: 'blur(80px)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: '20%', right: '10%', width: 260, height: 260, borderRadius: '50%', background: 'rgba(167,139,250,0.06)', filter: 'blur(80px)', pointerEvents: 'none' }} />
+        {/* Gradient overlays */}
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse 80% 60% at 50% 40%, rgba(99,102,241,0.07) 0%, transparent 70%)' }} />
+        <div style={{ position: 'absolute', top: '10%', left: '5%', width: 340, height: 340, borderRadius: '50%', background: 'rgba(99,102,241,0.07)', filter: 'blur(90px)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: '15%', right: '8%', width: 280, height: 280, borderRadius: '50%', background: 'rgba(167,139,250,0.05)', filter: 'blur(90px)', pointerEvents: 'none' }} />
 
         {/* Grid */}
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(rgba(99,102,241,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.04) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(rgba(99,102,241,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.035) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
 
-        <motion.div style={{ y: heroY, opacity: heroOpacity, position: 'relative', zIndex: 2, width: '100%', maxWidth: 900, margin: '0 auto', padding: '0 24px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ position: 'relative', zIndex: 2, width: '100%', maxWidth: 900, margin: '0 auto', padding: '0 24px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
           {/* Badge */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 3.5 }}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 28, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: 100, padding: '6px 16px 6px 10px' }}>
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 32, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: 100, padding: '6px 16px 6px 10px' }}>
             <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Zap size={11} color="white" /></span>
             <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--accent-secondary)', letterSpacing: '0.02em' }}>AI-Powered Digital Forensics Platform</span>
           </motion.div>
 
-          {/* MacBook animation */}
-          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }} style={{ width: '100%', marginBottom: 40 }}>
-            <MacBookHero />
+          {/* ── 3D MacBook ── */}
+          <motion.div initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.9, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}>
+            <div style={{ position: 'relative', width: 300, height: 240, marginBottom: 32 }}>
+              <MacBook3D />
+            </div>
           </motion.div>
 
-          {/* Sub headline */}
-          <motion.h1 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 3.8 }}
-            style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(1.4rem, 3vw, 2rem)', letterSpacing: '-0.04em', lineHeight: 1.25, marginBottom: 18, textAlign: 'center', background: 'linear-gradient(135deg, #f1f0fa 40%, var(--accent-secondary) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-            Investigate smarter. Close cases faster.
-          </motion.h1>
+          {/* ── Rotating words hero ── */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.6 }} style={{ width: '100%' }}>
+            <AnimatedHero />
+          </motion.div>
 
-          <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 3.95 }}
+          {/* Sub-description */}
+          <motion.p initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.8 }}
             style={{ fontSize: 'clamp(0.9rem, 1.8vw, 1.05rem)', color: 'var(--text-secondary)', lineHeight: 1.75, maxWidth: 580, margin: '0 auto 36px', textAlign: 'center' }}>
-            AI-assisted evidence analysis, automated forensic reporting, chain-of-custody compliance, and real-time threat intelligence — all in one platform.
+            AI-assisted evidence analysis, automated forensic reporting, chain-of-custody compliance, and real-time threat intelligence — all in one premium platform.
           </motion.p>
 
           {/* CTAs */}
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 4.1 }}
-            style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 44 }}>
-            <Link to="/login" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 30px', borderRadius: 10, fontSize: '0.94rem', fontWeight: 700, background: 'var(--gradient-primary)', color: 'white', textDecoration: 'none', boxShadow: '0 6px 28px rgba(99,102,241,0.4)', fontFamily: 'var(--font-display)', transition: 'all 0.2s' }}
+          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.95 }}
+            style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 40 }}>
+            <Link to="/login"
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 30px', borderRadius: 10, fontSize: '0.94rem', fontWeight: 700, background: 'var(--gradient-primary)', color: 'white', textDecoration: 'none', boxShadow: '0 6px 28px rgba(99,102,241,0.4)', fontFamily: 'var(--font-display)', transition: 'all 0.2s' }}
               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 10px 40px rgba(99,102,241,0.6)' }}
               onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 6px 28px rgba(99,102,241,0.4)' }}>
-              Start Investigating <ArrowRight size={17} />
+              Start Investigating <MoveRight size={17} />
             </Link>
-            <a href="#features" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 26px', borderRadius: 10, fontSize: '0.94rem', fontWeight: 600, background: 'rgba(255,255,255,0.04)', color: 'var(--text-primary)', textDecoration: 'none', border: '1px solid var(--border-primary)', fontFamily: 'var(--font-display)', transition: 'all 0.2s' }}
+            <a href="#features"
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 26px', borderRadius: 10, fontSize: '0.94rem', fontWeight: 600, background: 'rgba(255,255,255,0.04)', color: 'var(--text-primary)', textDecoration: 'none', border: '1px solid var(--border-primary)', fontFamily: 'var(--font-display)', transition: 'all 0.2s' }}
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.08)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.25)' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'var(--border-primary)' }}>
               See Features <ChevronDown size={17} />
@@ -388,7 +400,7 @@ export default function LandingPage() {
           </motion.div>
 
           {/* Trust pills */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 4.3 }}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 1.1 }}
             style={{ display: 'flex', gap: 22, justifyContent: 'center', flexWrap: 'wrap' }}>
             {['SHA-256 Hashing', 'AES-256 Encrypted', 'GDPR Compliant', 'Open Source'].map(t => (
               <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.74rem', color: 'var(--text-muted)' }}>
@@ -396,9 +408,9 @@ export default function LandingPage() {
               </div>
             ))}
           </motion.div>
-        </motion.div>
+        </div>
 
-        {/* Scroll indicator */}
+        {/* Scroll hint */}
         <motion.div animate={{ y: [0, 8, 0] }} transition={{ duration: 2, repeat: Infinity }}
           style={{ position: 'absolute', bottom: 32, left: '50%', transform: 'translateX(-50%)', color: 'var(--text-muted)', zIndex: 2 }}>
           <ChevronDown size={22} />
@@ -406,13 +418,14 @@ export default function LandingPage() {
       </section>
 
       {/* ── STATS ── */}
-      <section style={{ padding: '72px 48px', borderTop: '1px solid var(--border-primary)', borderBottom: '1px solid var(--border-primary)', background: 'rgba(99,102,241,0.02)' }}>
-        <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 36 }}>
-          <Stat value="10K+" label="Cases Investigated" />
-          <Stat value="99.9%" label="Evidence Integrity" />
-          <Stat value="< 2s" label="AI Parse Time" />
-          <Stat value="50+" label="Evidence Formats" />
-          <Stat value="SOC 2" label="Compliance Ready" />
+      <section style={{ padding: '64px 48px', borderTop: '1px solid var(--border-primary)', borderBottom: '1px solid var(--border-primary)', background: 'rgba(99,102,241,0.02)' }}>
+        <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 32 }}>
+          {[['10K+', 'Cases Investigated'], ['99.9%', 'Evidence Integrity'], ['< 2s', 'AI Parse Time'], ['50+', 'Evidence Formats'], ['SOC 2', 'Compliance Ready']].map(([v, l]) => (
+            <motion.div key={l} initial={{ opacity: 0, scale: 0.85 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }} style={{ textAlign: 'center' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.4rem', fontWeight: 800, letterSpacing: '-0.05em', background: 'var(--gradient-primary)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', lineHeight: 1, marginBottom: 6 }}>{v}</div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{l}</div>
+            </motion.div>
+          ))}
         </div>
       </section>
 
@@ -423,12 +436,8 @@ export default function LandingPage() {
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 14, padding: '5px 14px', borderRadius: 100, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', fontSize: '0.72rem', fontWeight: 600, color: 'var(--accent-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               <Star size={10} /> Platform Features
             </div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 800, letterSpacing: '-0.04em', color: 'var(--text-primary)', marginBottom: 14 }}>
-              Everything you need to investigate faster
-            </h2>
-            <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', maxWidth: 520, margin: '0 auto', lineHeight: 1.75 }}>
-              Built for cybersecurity professionals, incident responders, and forensic analysts.
-            </p>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 800, letterSpacing: '-0.04em', color: 'var(--text-primary)', marginBottom: 14 }}>Everything you need to investigate faster</h2>
+            <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', maxWidth: 520, margin: '0 auto', lineHeight: 1.75 }}>Built for cybersecurity professionals, incident responders, and forensic analysts.</p>
           </motion.div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
             {features.map(f => <FeatureCard key={f.title} {...f} />)}
@@ -440,9 +449,7 @@ export default function LandingPage() {
       <section style={{ padding: '80px 48px', background: 'rgba(6,6,8,0.8)', borderTop: '1px solid var(--border-primary)', borderBottom: '1px solid var(--border-primary)' }}>
         <div style={{ maxWidth: 860, margin: '0 auto' }}>
           <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} style={{ textAlign: 'center', marginBottom: 56 }}>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.5rem, 3vw, 2.2rem)', fontWeight: 800, letterSpacing: '-0.04em', color: 'var(--text-primary)', marginBottom: 10 }}>
-              From evidence to report in minutes
-            </h2>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.5rem, 3vw, 2.2rem)', fontWeight: 800, letterSpacing: '-0.04em', color: 'var(--text-primary)', marginBottom: 10 }}>From evidence to report in minutes</h2>
             <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.7 }}>Not hours. Not days.</p>
           </motion.div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 28 }}>
@@ -451,7 +458,7 @@ export default function LandingPage() {
               { icon: Search, label: 'AI Parses & Correlates', desc: 'Automated parsing, timeline extraction, IOC matching, anomaly detection.', color: '#a78bfa' },
               { icon: FileText, label: 'Generate Report', desc: 'One-click AI report generation. Review, edit, export to PDF.', color: '#f59e0b' },
             ].map((s, i) => (
-              <motion.div key={s.label} initial={{ opacity: 0, y: 22 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.12, duration: 0.5 }} style={{ textAlign: 'center', padding: '28px 16px' }}>
+              <motion.div key={s.label} initial={{ opacity: 0, y: 22 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.12 }} style={{ textAlign: 'center', padding: '28px 16px' }}>
                 <div style={{ width: 54, height: 54, borderRadius: '50%', margin: '0 auto 16px', background: `linear-gradient(135deg, ${s.color}, ${s.color}cc)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 4px 24px ${s.color}35`, position: 'relative' }}>
                   <s.icon size={23} color="white" />
                   <span style={{ position: 'absolute', top: -8, right: -8, width: 22, height: 22, borderRadius: '50%', background: 'var(--bg-primary)', border: `2px solid ${s.color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.62rem', fontWeight: 800, color: s.color }}>{i + 1}</span>
@@ -472,10 +479,9 @@ export default function LandingPage() {
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 4.5vw, 3rem)', fontWeight: 800, letterSpacing: '-0.05em', background: 'linear-gradient(135deg, #f1f0fa, var(--accent-secondary))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', lineHeight: 1.1, marginBottom: 20 }}>
             Ready to investigate smarter?
           </h2>
-          <p style={{ fontSize: '0.94rem', color: 'var(--text-secondary)', lineHeight: 1.75, marginBottom: 36 }}>
-            Join forensic investigators using ForensicAI to close cases faster with AI-assisted analysis and automated reporting.
-          </p>
-          <Link to="/login" style={{ display: 'inline-flex', alignItems: 'center', gap: 9, padding: '14px 34px', borderRadius: 12, fontSize: '0.98rem', fontWeight: 700, background: 'var(--gradient-primary)', color: 'white', textDecoration: 'none', boxShadow: '0 8px 36px rgba(99,102,241,0.45)', fontFamily: 'var(--font-display)', transition: 'all 0.2s' }}
+          <p style={{ fontSize: '0.94rem', color: 'var(--text-secondary)', lineHeight: 1.75, marginBottom: 36 }}>Join forensic investigators using ForensicAI to close cases faster with AI-assisted analysis and automated reporting.</p>
+          <Link to="/login"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 9, padding: '14px 34px', borderRadius: 12, fontSize: '0.98rem', fontWeight: 700, background: 'var(--gradient-primary)', color: 'white', textDecoration: 'none', boxShadow: '0 8px 36px rgba(99,102,241,0.45)', fontFamily: 'var(--font-display)', transition: 'all 0.2s' }}
             onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 14px 50px rgba(99,102,241,0.65)' }}
             onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 8px 36px rgba(99,102,241,0.45)' }}>
             Create Free Account <ArrowRight size={18} />
