@@ -159,20 +159,20 @@ export default function Dashboard() {
             <AreaChart data={caseActivity}>
               <defs>
                 <linearGradient id="colorCases" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00d4ff" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#00d4ff" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.35} />
+                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="colorReports" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#7b61ff" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#7b61ff" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-              <XAxis dataKey="month" stroke="#55556e" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis stroke="#55556e" fontSize={12} tickLine={false} axisLine={false} />
+              <XAxis dataKey="month" stroke="#4a4870" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke="#4a4870" fontSize={11} tickLine={false} axisLine={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey="cases" name="Cases" stroke="#00d4ff" fillOpacity={1} fill="url(#colorCases)" strokeWidth={2} />
-              <Area type="monotone" dataKey="reports" name="Reports" stroke="#7b61ff" fillOpacity={1} fill="url(#colorReports)" strokeWidth={2} />
+              <Area type="monotone" dataKey="cases" name="Cases" stroke="#6366f1" fillOpacity={1} fill="url(#colorCases)" strokeWidth={2} />
+              <Area type="monotone" dataKey="reports" name="Reports" stroke="#a78bfa" fillOpacity={1} fill="url(#colorReports)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -303,7 +303,7 @@ export default function Dashboard() {
           height: 50,
           borderRadius: '50%',
           background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-          boxShadow: '0 4px 20px rgba(0, 212, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 4px 20px rgba(99, 102, 241, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

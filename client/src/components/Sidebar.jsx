@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext'
 
 const navItems = [
   { section: 'Analysis', items: [
-    { to: '/', icon: LayoutDashboard, label: 'Dashboard', badge: null },
+    { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', badge: null },
     { to: '/cases', icon: FolderOpen, label: 'Case Management', badge: null },
     { to: '/evidence', icon: Upload, label: 'Evidence Upload', badge: null },
     { to: '/timeline', icon: Clock, label: 'Timeline', badge: null },
@@ -63,8 +63,8 @@ export default function Sidebar({ isOpen, onClose }) {
             <nav className="sidebar-nav">
               {section.items.map((item) => {
                 const Icon = item.icon
-                const isActive = item.to === '/'
-                  ? location.pathname === '/'
+                const isActive = item.to === '/dashboard'
+                  ? location.pathname === '/dashboard'
                   : location.pathname.startsWith(item.to)
                 return (
                   <NavLink

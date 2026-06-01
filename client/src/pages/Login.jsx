@@ -245,7 +245,7 @@ export default function Login() {
       try {
         const data = await registerUser({ name, email, password, role, organization })
         login(data.token, data.user, data.sessionTimeout)
-        navigate('/')
+        navigate('/dashboard')
       } catch (err) {
         setError(err.message || 'Registration failed')
       } finally {
@@ -262,7 +262,7 @@ export default function Login() {
           return
         }
         login(data.token, data.user, data.sessionTimeout)
-        navigate('/')
+        navigate('/dashboard')
       } catch (err) {
         setError(err.message || 'Authentication failed')
       } finally {
@@ -279,7 +279,7 @@ export default function Login() {
       const credential = await startAuthentication({ optionsJSON: options })
       const data = await authenticatePasskey(loginToken, credential)
       login(data.token, data.user, data.sessionTimeout)
-      navigate('/')
+      navigate('/dashboard')
     } catch (err) {
       if (err.name === 'AbortError' || err.name === 'NotAllowedError') {
         setError('Passkey verification was cancelled.')
