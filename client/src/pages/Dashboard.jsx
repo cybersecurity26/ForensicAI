@@ -204,28 +204,112 @@ export default function Dashboard() {
     fetchDashboard()
   }, [])
 
-  // Driver.js Tour
+  // Driver.js Tour — full professional walkthrough
   useEffect(() => {
-    if (isFirstTime && !localStorage.getItem('forensicai_tour_done')) {
+    if (!localStorage.getItem('forensicai_tour_done')) {
       const driverObj = driver({
         showProgress: true,
+        progressText: '{{current}} of {{total}}',
         animate: true,
-        allowClose: false,
+        smoothScroll: true,
+        allowClose: true,
+        overlayOpacity: 0.75,
+        stagePadding: 8,
         popoverClass: 'driver-popover',
+        nextBtnText: 'Next →',
+        prevBtnText: '← Prev',
+        doneBtnText: '✓ Got it',
         steps: [
-          { element: '#tour-nav-cases', popover: { title: 'Create a Case', description: 'Every investigation starts here. Create a case to organize your findings.', side: "right", align: 'start' } },
-          { element: '#tour-nav-evidence', popover: { title: 'Upload Evidence', description: 'Upload PCAP, EVTX, and log files for automated processing and SHA-256 hashing.', side: "right", align: 'start' } },
-          { element: '#tour-nav-anomalies', popover: { title: 'AI Anomaly Detection', description: 'Once uploaded, our ML engine automatically extracts IOCs and maps MITRE techniques.', side: "right", align: 'start' } },
-          { element: '#tour-nav-chat', popover: { title: 'Case Copilot', description: 'Ask plain-English questions about your artifacts in the RAG Chat.', side: "right", align: 'start' } }
+          {
+            element: '#tour-page-header',
+            popover: {
+              title: '🛡️ Welcome to ForensicAI',
+              description: 'Your command center for digital forensics investigations. This tour will walk you through every feature in under 2 minutes. Use the buttons below to navigate.',
+              side: 'bottom',
+              align: 'start',
+            }
+          },
+          {
+            element: '#tour-stats-grid',
+            popover: {
+              title: '📊 Investigation KPIs',
+              description: 'These cards update in real-time — tracking active cases, evidence files processed, detected threat indicators, critical flags, generated reports, and integrity alerts.',
+              side: 'bottom',
+              align: 'start',
+            }
+          },
+          {
+            element: '#tour-nav-cases',
+            popover: {
+              title: '📁 Case Management',
+              description: 'Start every investigation by creating a case. Each case gets a unique case number, priority level, status tracking, and an assigned investigator. Think of it as your case file.',
+              side: 'right',
+              align: 'start',
+            }
+          },
+          {
+            element: '#tour-nav-evidence',
+            popover: {
+              title: '📂 Evidence Upload',
+              description: 'Upload your forensic artifacts here — .log, .pcap, .evtx, .csv, .json, .xml files. Every file is SHA-256 hashed automatically for chain-of-custody integrity before analysis begins.',
+              side: 'right',
+              align: 'start',
+            }
+          },
+          {
+            element: '#tour-nav-timeline',
+            popover: {
+              title: '⏱️ Timeline Reconstruction',
+              description: 'After uploading evidence, the AI parses and sorts all events into a chronological timeline. Each event is tagged with a source file, severity level, and MITRE tactic.',
+              side: 'right',
+              align: 'start',
+            }
+          },
+          {
+            element: '#tour-nav-anomalies',
+            popover: {
+              title: '🔍 AI Anomaly Detection',
+              description: 'An ML Isolation Forest model scans your events for statistical outliers — unusual login hours, rare commands, abnormal data volumes. Suspicious clusters are highlighted automatically.',
+              side: 'right',
+              align: 'start',
+            }
+          },
+          {
+            element: '#tour-nav-mitre',
+            popover: {
+              title: '⚔️ MITRE ATT&CK Mapping',
+              description: 'ForensicAI automatically maps extracted indicators to the MITRE ATT&CK framework — showing which tactics and techniques are present in your evidence so you can prioritize your response.',
+              side: 'right',
+              align: 'start',
+            }
+          },
+          {
+            element: '#tour-nav-chat',
+            popover: {
+              title: '🤖 Case AI Copilot (RAG)',
+              description: 'Ask plain English questions about your evidence: "Which IP appeared most?", "List all failed logins", "Summarize privilege escalation events." The AI searches your case artifacts to answer.',
+              side: 'right',
+              align: 'start',
+            }
+          },
+          {
+            element: '#tour-nav-reports',
+            popover: {
+              title: '📄 Forensic Report Generation',
+              description: 'One click generates a complete court-ready forensic report — executive summary, full event timeline, IOC table, MITRE mapping, and a SHA-256 chain-of-custody appendix. Export to PDF.',
+              side: 'right',
+              align: 'start',
+            }
+          },
         ],
         onDestroyStarted: () => {
           localStorage.setItem('forensicai_tour_done', '1')
           driverObj.destroy()
         }
       })
-      setTimeout(() => driverObj.drive(), 800)
+      setTimeout(() => driverObj.drive(), 900)
     }
-  }, [isFirstTime])
+  }, [])
 
   if (loading) {
     return (
@@ -240,7 +324,7 @@ export default function Dashboard() {
     <motion.div className="page-enter" variants={container} initial="hidden" animate="show">
 
       {/* ── Page Header ── */}
-      <motion.div className="page-header" variants={item} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+      <motion.div id="tour-page-header" className="page-header" variants={item} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 className="page-title">Investigation Dashboard</h1>
           <p className="page-description">Overview of your digital forensics investigations, evidence, and AI reporting.</p>
@@ -270,7 +354,7 @@ export default function Dashboard() {
       </AnimatePresence>
 
       {/* ── Stats Grid ── */}
-      <motion.div className="stats-grid" variants={container} initial="hidden" animate="show">
+      <motion.div id="tour-stats-grid" className="stats-grid" variants={container} initial="hidden" animate="show">
         {stats.map((stat, i) => {
           const Icon = stat.icon
           return (

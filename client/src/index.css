@@ -2583,65 +2583,121 @@ a:hover {
 }
 
 /* ============================================
-   DRIVER.JS OVERRIDES (PlotLens Theme)
+   DRIVER.JS OVERRIDES — Professional Tour Theme
    ============================================ */
 
 .driver-popover {
-  background-color: #f4f1ea !important;
+  background: linear-gradient(145deg, #f9f7f2, #f0ede4) !important;
   color: #1a1a1a !important;
   font-family: 'Syne', sans-serif !important;
-  border-radius: 12px !important;
-  border: 1px solid #d4cfc4 !important;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important;
-  padding: 20px !important;
+  border-radius: 14px !important;
+  border: 1px solid #c8c4b8 !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.15) inset !important;
+  padding: 0 !important;
+  min-width: 340px !important;
+  max-width: 400px !important;
+  overflow: hidden !important;
+}
+
+/* Lime accent bar at top of every popover */
+.driver-popover::before {
+  content: '' !important;
+  display: block !important;
+  height: 3px !important;
+  background: linear-gradient(90deg, #84cc16, #bef264, #84cc16) !important;
+  border-radius: 14px 14px 0 0 !important;
+  width: 100% !important;
+}
+
+.driver-popover-inner {
+  padding: 20px 22px 18px !important;
 }
 
 .driver-popover-title {
   font-family: 'Syne', sans-serif !important;
-  font-weight: 700 !important;
-  font-size: 1.15rem !important;
-  color: #111 !important;
-  margin-bottom: 8px !important;
+  font-weight: 800 !important;
+  font-size: 1.05rem !important;
+  color: #0a0a0a !important;
+  margin-bottom: 10px !important;
+  letter-spacing: -0.01em !important;
+  line-height: 1.3 !important;
+  padding: 20px 22px 0 !important;
 }
 
 .driver-popover-description {
   font-family: 'Inter', sans-serif !important;
-  color: #444 !important;
-  font-size: 0.9rem !important;
-  line-height: 1.5 !important;
+  color: #3a3830 !important;
+  font-size: 0.86rem !important;
+  line-height: 1.65 !important;
+  padding: 0 22px 16px !important;
+  margin: 0 !important;
 }
 
-.driver-popover-close-btn {
-  color: #666 !important;
+.driver-popover-progress-text {
+  font-family: 'Syne', sans-serif !important;
+  font-size: 0.7rem !important;
+  color: #888 !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em !important;
+  padding: 0 22px !important;
 }
 
-.driver-popover-close-btn:hover {
-  color: #000 !important;
+.driver-popover-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 10px 22px 16px !important;
+  border-top: 1px solid rgba(0,0,0,0.08) !important;
+  margin-top: 4px !important;
 }
 
 .driver-popover-footer button {
   font-family: 'Syne', sans-serif !important;
-  font-weight: 600 !important;
-  border-radius: 6px !important;
+  font-weight: 700 !important;
+  border-radius: 7px !important;
   text-shadow: none !important;
-  background-color: #000 !important;
+  background: #0d0d0d !important;
   color: #bef264 !important;
-  border: 1px solid #333 !important;
-  transition: all 0.2s !important;
-  padding: 6px 14px !important;
+  border: none !important;
+  transition: all 0.2s ease !important;
+  padding: 7px 16px !important;
+  font-size: 0.82rem !important;
+  letter-spacing: 0.01em !important;
+  cursor: pointer !important;
 }
 
 .driver-popover-footer button:hover {
-  background-color: #111 !important;
+  background: #1a1a1a !important;
   color: #d9f99d !important;
+  box-shadow: 0 0 12px rgba(190, 242, 100, 0.3) !important;
+  transform: translateY(-1px) !important;
 }
 
-.driver-popover-footer .driver-popover-navigation-btns {
+.driver-popover-close-btn {
+  position: absolute !important;
+  top: 14px !important;
+  right: 14px !important;
+  width: 22px !important;
+  height: 22px !important;
+  background: rgba(0,0,0,0.06) !important;
+  border-radius: 50% !important;
   display: flex !important;
-  gap: 8px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #888 !important;
+  font-size: 0.75rem !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: all 0.2s !important;
+}
+
+.driver-popover-close-btn:hover {
+  background: rgba(0,0,0,0.14) !important;
+  color: #000 !important;
 }
 
 div.driver-highlighted-element {
-  box-shadow: 0 0 0 4px #bef264, 0 0 20px rgba(190, 242, 100, 0.6) !important;
+  box-shadow: 0 0 0 3px #84cc16, 0 0 0 6px rgba(132, 204, 22, 0.25), 0 0 30px rgba(190, 242, 100, 0.4) !important;
   border-radius: 8px !important;
+  transition: box-shadow 0.3s ease !important;
 }
