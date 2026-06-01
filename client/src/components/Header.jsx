@@ -260,7 +260,7 @@ export default function Header({ onMenuToggle }) {
               )}
               {searchResults.length > 0 ? searchResults.map((item, i) => {
                 const catColors = {
-                  Page: '#7b61ff', Case: '#00d4ff', Report: '#00e676', Evidence: '#ffab40',
+                  Page: '#a78bfa', Case: '#6366f1', Report: '#10b981', Evidence: '#f59e0b',
                 }
                 const catColor = catColors[item.category] || 'var(--text-muted)'
                 return (
@@ -398,15 +398,15 @@ export default function Header({ onMenuToggle }) {
                       style={{
                         padding: '12px 16px', cursor: 'pointer',
                         borderBottom: '1px solid var(--border-subtle)',
-                        background: n.unread ? 'rgba(0, 240, 255, 0.03)' : 'transparent',
+                        background: n.unread ? 'rgba(99, 102, 241, 0.04)' : 'transparent',
                         transition: 'background 0.15s',
                       }}
                       onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = n.unread ? 'rgba(0, 240, 255, 0.03)' : 'transparent'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = n.unread ? 'rgba(99, 102, 241, 0.04)' : 'transparent'}
                     >
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                         {n.unread && (
-                          <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent-primary)', marginTop: 5, flexShrink: 0 }}></div>
+                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-primary)', marginTop: 5, flexShrink: 0, boxShadow: '0 0 6px var(--glow-indigo)' }}></div>
                         )}
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: '0.83rem', color: 'var(--text-primary)', lineHeight: 1.4 }}>
@@ -445,10 +445,10 @@ export default function Header({ onMenuToggle }) {
                 <div style={{ padding: '18px 16px', borderBottom: '1px solid var(--border-primary)', textAlign: 'center' }}>
                   <div style={{
                     width: 52, height: 52, borderRadius: '50%', margin: '0 auto 10px',
-                    background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                    background: 'var(--gradient-primary)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '1.1rem', fontWeight: 800, color: '#fff',
-                    boxShadow: '0 4px 16px rgba(0,224,255,0.2)',
+                    boxShadow: '0 4px 16px rgba(99,102,241,0.3)',
                   }}>
                     {user?.name ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : '?'}
                   </div>
@@ -474,13 +474,13 @@ export default function Header({ onMenuToggle }) {
                     onClick={logout}
                     style={{
                       width: '100%', padding: '10px 14px', border: 'none', borderRadius: 8,
-                      background: 'rgba(255, 107, 107, 0.08)', color: '#ff6b6b',
+                      background: 'rgba(244, 63, 94, 0.08)', color: 'var(--accent-danger)',
                       cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600,
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                       transition: 'background 0.2s',
                     }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 107, 107, 0.15)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 107, 107, 0.08)'}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(244, 63, 94, 0.15)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(244, 63, 94, 0.08)'}
                   >
                     <LogOut size={16} /> Sign Out
                   </button>
