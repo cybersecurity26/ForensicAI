@@ -12,6 +12,9 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts'
 import { getDashboardStats, getDashboardActivity, getCases } from '../api'
+import { AnimatedText } from '../components/AnimatedText'
+import { driver } from 'driver.js'
+import 'driver.js/dist/driver.css'
 
 const container = {
   hidden: { opacity: 0 },
@@ -39,136 +42,6 @@ const CustomTooltip = ({ active, payload, label }) => {
     )
   }
   return null
-}
-
-/* ═══════════════════════════════════════════
-   FIRST-TIME ONBOARDING BANNER
-═══════════════════════════════════════════ */
-const STEPS = [
-  { icon: FolderOpen, label: 'Create a Case', desc: 'Every investigation starts with a case. Give it a name, priority, and description.', path: '/cases', action: 'Create Case', color: '#6366f1' },
-  { icon: Upload, label: 'Upload Evidence', desc: 'Upload log files, PCAP captures, disk images, or any forensic artefacts.', path: '/evidence', action: 'Upload Files', color: '#a78bfa' },
-  { icon: Activity, label: 'Run AI Analysis', desc: 'AI automatically extracts timeline events, detects anomalies, and maps MITRE techniques.', path: '/anomalies', action: 'View Analysis', color: '#f59e0b' },
-  { icon: FileText, label: 'Generate Report', desc: 'One-click forensic report with AI narrative, timeline, and chain-of-custody proof.', path: '/reports', action: 'Generate Report', color: '#10b981' },
-]
-
-function OnboardingBanner() {
-  const navigate = useNavigate()
-  const [activeStep, setActiveStep] = useState(0)
-  const [dismissed, setDismissed] = useState(() => localStorage.getItem('forensicai_onboarding_dismissed') === '1')
-
-  if (dismissed) return null
-
-  const step = STEPS[activeStep]
-  const StepIcon = step.icon
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -12 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -12 }}
-      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      style={{
-        background: 'var(--bg-card)', border: '1px solid rgba(99,102,241,0.25)',
-        borderRadius: 16, padding: '24px 28px', marginBottom: 28,
-        position: 'relative', overflow: 'hidden',
-      }}
-    >
-      {/* Top accent line */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'var(--gradient-primary)' }} />
-      {/* Dismiss */}
-      <button
-        onClick={() => { setDismissed(true); localStorage.setItem('forensicai_onboarding_dismissed', '1') }}
-        style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center', transition: 'color 0.2s' }}
-        title="Dismiss"
-        onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
-        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-      ><X size={16} /></button>
-
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-        <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Sparkles size={14} color="white" />
-        </div>
-        <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-            Welcome to ForensicAI 👋
-          </div>
-          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Follow these steps to run your first investigation</div>
-        </div>
-      </div>
-
-      {/* Step tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        {STEPS.map((s, i) => {
-          const SI = s.icon
-          return (
-            <button
-              key={i}
-              onClick={() => setActiveStep(i)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
-                fontSize: '0.78rem', fontWeight: 600, fontFamily: 'var(--font-primary)',
-                transition: 'all 0.2s',
-                background: activeStep === i ? s.color : 'rgba(255,255,255,0.04)',
-                color: activeStep === i ? 'white' : 'var(--text-muted)',
-                boxShadow: activeStep === i ? `0 2px 12px ${s.color}50` : 'none',
-              }}
-            >
-              <SI size={12} /> Step {i + 1}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Active step detail */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeStep}
-          initial={{ opacity: 0, x: 10 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -10 }}
-          transition={{ duration: 0.2 }}
-          style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}
-        >
-          <div style={{ width: 52, height: 52, borderRadius: 14, background: `${step.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${step.color}30`, flexShrink: 0 }}>
-            <StepIcon size={24} color={step.color} />
-          </div>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', marginBottom: 4 }}>{step.label}</div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{step.desc}</div>
-          </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <button
-              onClick={() => navigate(step.path)}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 20px', borderRadius: 9, border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.84rem', background: `linear-gradient(135deg, ${step.color}, ${step.color}cc)`, color: 'white', boxShadow: `0 4px 16px ${step.color}40`, transition: 'all 0.2s', whiteSpace: 'nowrap' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = `0 6px 20px ${step.color}60` }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 4px 16px ${step.color}40` }}
-            >
-              {step.action} <ChevronRight size={14} />
-            </button>
-            {activeStep < STEPS.length - 1 && (
-              <button
-                onClick={() => setActiveStep(i => i + 1)}
-                style={{ padding: '9px 14px', borderRadius: 9, border: '1px solid var(--border-primary)', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem', transition: 'all 0.2s' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'; e.currentTarget.style.color = 'var(--text-primary)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-primary)'; e.currentTarget.style.color = 'var(--text-muted)' }}
-              >
-                Next →
-              </button>
-            )}
-          </div>
-        </motion.div>
-      </AnimatePresence>
-
-      {/* Progress dots */}
-      <div style={{ display: 'flex', gap: 6, marginTop: 18, justifyContent: 'center' }}>
-        {STEPS.map((s, i) => (
-          <div key={i} onClick={() => setActiveStep(i)} style={{ width: activeStep === i ? 20 : 6, height: 6, borderRadius: 3, background: activeStep === i ? step.color : 'rgba(255,255,255,0.12)', transition: 'all 0.3s', cursor: 'pointer' }} />
-        ))}
-      </div>
-    </motion.div>
-  )
 }
 
 /* ═══════════════════════════════════════════
@@ -331,6 +204,29 @@ export default function Dashboard() {
     fetchDashboard()
   }, [])
 
+  // Driver.js Tour
+  useEffect(() => {
+    if (isFirstTime && !localStorage.getItem('forensicai_tour_done')) {
+      const driverObj = driver({
+        showProgress: true,
+        animate: true,
+        allowClose: false,
+        popoverClass: 'driver-popover',
+        steps: [
+          { element: '#tour-nav-cases', popover: { title: 'Create a Case', description: 'Every investigation starts here. Create a case to organize your findings.', side: "right", align: 'start' } },
+          { element: '#tour-nav-evidence', popover: { title: 'Upload Evidence', description: 'Upload PCAP, EVTX, and log files for automated processing and SHA-256 hashing.', side: "right", align: 'start' } },
+          { element: '#tour-nav-anomalies', popover: { title: 'AI Anomaly Detection', description: 'Once uploaded, our ML engine automatically extracts IOCs and maps MITRE techniques.', side: "right", align: 'start' } },
+          { element: '#tour-nav-chat', popover: { title: 'Case Copilot', description: 'Ask plain-English questions about your artifacts in the RAG Chat.', side: "right", align: 'start' } }
+        ],
+        onDestroyStarted: () => {
+          localStorage.setItem('forensicai_tour_done', '1')
+          driverObj.destroy()
+        }
+      })
+      setTimeout(() => driverObj.drive(), 800)
+    }
+  }, [isFirstTime])
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', gap: 12, color: 'var(--text-muted)' }}>
@@ -366,7 +262,11 @@ export default function Dashboard() {
 
       {/* ── First-time onboarding banner ── */}
       <AnimatePresence>
-        {isFirstTime && <OnboardingBanner />}
+        {isFirstTime && (
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} style={{ marginBottom: '32px' }}>
+            <AnimatedText text="Welcome to ForensicAI 👋" />
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* ── Stats Grid ── */}

@@ -68,6 +68,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   : location.pathname.startsWith(item.to)
                 return (
                   <NavLink
+                    id={`tour-nav-${item.to.replace('/', '')}`}
                     key={item.to}
                     to={item.to}
                     className={`sidebar-link ${isActive ? 'active' : ''}`}

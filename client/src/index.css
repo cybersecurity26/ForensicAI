@@ -4,7 +4,8 @@
    Indigo-led palette, glassmorphism, micro-animations
    ============================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Sora:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import 'driver.js/dist/driver.css';
 
 /* ---------- CSS Custom Properties ---------- */
 :root {
@@ -2581,3 +2582,66 @@ a:hover {
   100% { transform: rotateX(80deg) rotateY(0deg) rotateZ(0deg); box-shadow: 0 0 60px 40px rgba(0,0,0,0.3); }
 }
 
+/* ============================================
+   DRIVER.JS OVERRIDES (PlotLens Theme)
+   ============================================ */
+
+.driver-popover {
+  background-color: #f4f1ea !important;
+  color: #1a1a1a !important;
+  font-family: 'Syne', sans-serif !important;
+  border-radius: 12px !important;
+  border: 1px solid #d4cfc4 !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important;
+  padding: 20px !important;
+}
+
+.driver-popover-title {
+  font-family: 'Syne', sans-serif !important;
+  font-weight: 700 !important;
+  font-size: 1.15rem !important;
+  color: #111 !important;
+  margin-bottom: 8px !important;
+}
+
+.driver-popover-description {
+  font-family: 'Inter', sans-serif !important;
+  color: #444 !important;
+  font-size: 0.9rem !important;
+  line-height: 1.5 !important;
+}
+
+.driver-popover-close-btn {
+  color: #666 !important;
+}
+
+.driver-popover-close-btn:hover {
+  color: #000 !important;
+}
+
+.driver-popover-footer button {
+  font-family: 'Syne', sans-serif !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+  text-shadow: none !important;
+  background-color: #000 !important;
+  color: #bef264 !important;
+  border: 1px solid #333 !important;
+  transition: all 0.2s !important;
+  padding: 6px 14px !important;
+}
+
+.driver-popover-footer button:hover {
+  background-color: #111 !important;
+  color: #d9f99d !important;
+}
+
+.driver-popover-footer .driver-popover-navigation-btns {
+  display: flex !important;
+  gap: 8px !important;
+}
+
+div.driver-highlighted-element {
+  box-shadow: 0 0 0 4px #bef264, 0 0 20px rgba(190, 242, 100, 0.6) !important;
+  border-radius: 8px !important;
+}
