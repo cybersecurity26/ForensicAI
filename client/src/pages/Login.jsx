@@ -293,15 +293,17 @@ export default function Login() {
         {/* Brand */}
         <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 12, fontFamily: 'var(--font-display)' }}>
           <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'rgba(255,255,255,0.1)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255,255,255,0.15)',
+            width: 38, height: 38, borderRadius: 10,
+            background: 'var(--gradient-primary)',
+            boxShadow: '0 4px 16px rgba(99,102,241,0.4)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <Sparkles size={18} color="white" />
+            <Shield size={19} color="white" />
           </div>
-          <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'white', letterSpacing: '-0.02em' }}>ForensicAI</span>
+          <div>
+            <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'white', letterSpacing: '-0.02em', display: 'block' }}>ForensicAI</span>
+            <span style={{ fontSize: '0.6rem', color: 'rgba(167,139,250,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Intelligence Platform</span>
+          </div>
         </div>
 
         {/* ── CHARACTER STAGE ── */}
@@ -466,14 +468,15 @@ export default function Login() {
           transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
           style={{ width: '100%', maxWidth: 420 }}
         >
-          {/* Mobile logo */}
+          {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 36, justifyContent: 'center' }}>
-            <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Sparkles size={16} color="var(--accent-primary)" />
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(99,102,241,0.4)' }}>
+              <Shield size={18} color="white" />
             </div>
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 700, background: 'var(--gradient-primary)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-              ForensicAI
-            </span>
+            <div>
+              <span style={{ display: 'block', fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 800, letterSpacing: '-0.04em', background: 'var(--gradient-primary)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>ForensicAI</span>
+              <span style={{ display: 'block', fontSize: '0.55rem', color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1 }}>Intelligence Platform</span>
+            </div>
           </div>
 
           <AnimatePresence mode="wait">
