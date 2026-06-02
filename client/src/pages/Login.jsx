@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Shield, Eye, EyeOff, Mail, Lock, User,
@@ -290,8 +290,8 @@ export default function Login() {
         <div style={{ position: 'absolute', top: '20%', right: '15%', width: 280, height: 280, borderRadius: '50%', background: 'rgba(99,102,241,0.1)', filter: 'blur(70px)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: '25%', left: '5%', width: 220, height: 220, borderRadius: '50%', background: 'rgba(167,139,250,0.08)', filter: 'blur(60px)', pointerEvents: 'none' }} />
 
-        {/* Brand */}
-        <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 12, fontFamily: 'var(--font-display)' }}>
+        {/* Brand — links to landing */}
+        <Link to="/" style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 12, fontFamily: 'var(--font-display)', textDecoration: 'none' }}>
           <div style={{
             width: 38, height: 38, borderRadius: 10,
             background: 'var(--gradient-primary)',
@@ -304,7 +304,7 @@ export default function Login() {
             <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'white', letterSpacing: '-0.02em', display: 'block' }}>ForensicAI</span>
             <span style={{ fontSize: '0.6rem', color: 'rgba(167,139,250,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Intelligence Platform</span>
           </div>
-        </div>
+        </Link>
 
         {/* ── CHARACTER STAGE ── */}
         <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', height: 420 }}>
@@ -468,8 +468,8 @@ export default function Login() {
           transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
           style={{ width: '100%', maxWidth: 420 }}
         >
-          {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 36, justifyContent: 'center' }}>
+          {/* Logo — links to landing */}
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 36, justifyContent: 'center', textDecoration: 'none' }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(99,102,241,0.4)' }}>
               <Shield size={18} color="white" />
             </div>
@@ -477,7 +477,7 @@ export default function Login() {
               <span style={{ display: 'block', fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 800, letterSpacing: '-0.04em', background: 'var(--gradient-primary)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>ForensicAI</span>
               <span style={{ display: 'block', fontSize: '0.55rem', color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1 }}>Intelligence Platform</span>
             </div>
-          </div>
+          </Link>
 
           <AnimatePresence mode="wait">
             {requires2FA ? (
