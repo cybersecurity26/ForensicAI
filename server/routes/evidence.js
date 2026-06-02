@@ -97,39 +97,149 @@ router.post('/upload', optionalAuth, upload.array('files', 10), async (req, res,
         },
         processing: {
           progress: 0,
-          message: 'Queued for hashing, encryption, parsing, and normalization',
+          message: 'Processing evidence...',
         },
       })
 
       caseDoc.evidence.push(evidence._id)
 
-      const job = await enqueueEvidenceProcessing({
-        evidenceId: evidence._id,
-        caseId: caseDoc._id,
-        requestedBy: reqUser?.id,
-        reason: 'upload',
-      })
+      // Try BullMQ first; fall back to synchronous inline processing
+      let queued = false
+      try {
+        const job = await enqueueEvidenceProcessing({
+          evidenceId: evidence._id,
+          caseId: caseDoc._id,
+          requestedBy: reqUser?.id,
+          reason: 'upload',
+        })
+        evidence.processing.queueJobId = String(job.id)
+        evidence.processing.message = 'Queued for background processing'
+        await evidence.save()
+        jobs.push({ evidenceId: evidence._id, jobId: String(job.id) })
+        queued = true
+      } catch (queueErr) {
+        console.warn(`BullMQ unavailable, processing "${file.originalname}" inline:`, queueErr.message)
+      }
 
-      evidence.processing.queueJobId = String(job.id)
-      evidence.processing.message = 'Queued for background processing'
-      await evidence.save()
+      // Synchronous fallback: parse + hash + enrich directly
+      if (!queued) {
+        try {
+          const { computeFileHash } = await import('../utils/hash.js')
+          const { parseLogFile } = await import('../utils/parser.js')
+          const { detectEventAnomalies } = await import('../ml/anomalyDetector.js')
+
+          // 1. SHA-256 hash
+          evidence.status = 'hashing'
+          await evidence.save()
+          const sha256Hash = await computeFileHash(file.path)
+          evidence.sha256Hash = sha256Hash
+          evidence.verifiedAt = new Date()
+
+          // 2. Parse & normalize
+          const ext = path.extname(file.originalname).toLowerCase()
+          const PARSEABLE = new Set(['.log', '.txt', '.csv', '.json', '.xml', '.evtx', '.pcap', '.reg'])
+
+          if (PARSEABLE.has(ext)) {
+            evidence.status = 'parsing'
+            await evidence.save()
+            const parsedResult = await parseLogFile(file.path, { originalName: file.originalname })
+
+            // 3. ML anomaly detection
+            const mlResult = await detectEventAnomalies(parsedResult.events)
+
+            evidence.parsedData = {
+              events: mlResult.events.map(e => ({
+                timestamp: e.timestamp || '',
+                eventType: e.eventType || 'system',
+                source: e.source || file.originalname,
+                sourceType: e.sourceType || '',
+                host: e.host || '',
+                user: e.user || '',
+                sourceIp: e.sourceIp || '',
+                destinationIp: e.destinationIp || '',
+                process: e.process || '',
+                filePath: e.filePath || '',
+                registryKey: e.registryKey || '',
+                registryValue: e.registryValue || '',
+                detail: e.detail || '',
+                severity: e.severity || 'info',
+                raw: e.raw || '',
+                normalized: e.normalized !== false,
+                parserType: e.parserType || parsedResult.parser,
+                normalizerType: e.normalizerType || parsedResult.normalizer,
+                riskScore: e.riskScore || 0,
+                riskLevel: e.riskLevel || 'low',
+                riskReasons: e.riskReasons || [],
+                mlAnomaly: e.mlAnomaly || { isAnomaly: false, score: 0, confidence: 0, model: 'IsolationForest', reasons: [] },
+                threatIntel: e.threatIntel || { score: 0, isMalicious: false, details: '' },
+                mitreAttack: e.mitreAttack || { techniqueId: '', techniqueName: '', tactic: '' },
+              })),
+              summary: parsedResult.summary,
+              anomalies: mlResult.events
+                .filter(e => e.severity === 'danger' || e.severity === 'critical' || (e.riskScore || 0) >= 61)
+                .map(e => e.detail),
+              mlSummary: {
+                ...mlResult.mlSummary,
+                generatedAt: mlResult.mlSummary?.generatedAt ? new Date(mlResult.mlSummary.generatedAt) : new Date(),
+              },
+              mlAnomalies: mlResult.mlAnomalies,
+            }
+
+            evidence.metadata.lineCount = parsedResult.lineCount
+            evidence.processing.parserType = parsedResult.parser
+            evidence.processing.normalizerType = parsedResult.normalizer
+            evidence.processing.artifactType = parsedResult.artifactType
+            evidence.processing.normalizedAt = new Date()
+            evidence.status = parsedResult.events.length > 0 ? 'parsed' : 'verified'
+          } else {
+            evidence.status = 'verified'
+            evidence.parsedData = { events: [], summary: 'Binary artifact stored securely.', anomalies: [] }
+          }
+
+          evidence.processing.progress = 100
+          evidence.processing.message = 'Processing complete'
+          await evidence.save()
+          jobs.push({ evidenceId: evidence._id, mode: 'inline' })
+        } catch (processErr) {
+          console.error(`Inline processing failed for "${file.originalname}":`, processErr.message)
+          evidence.status = 'error'
+          evidence.processing.lastError = processErr.message
+          evidence.processing.message = 'Processing failed'
+          await evidence.save()
+        }
+      }
 
       await logAudit('evidence_uploaded', 'evidence', evidence._id,
-        `Evidence "${file.originalname}" uploaded and queued for secure processing`, req)
-      await logAudit('evidence_processing_queued', 'evidence', evidence._id,
-        `BullMQ job ${job.id} queued for "${file.originalname}"`, req)
+        `Evidence "${file.originalname}" uploaded and processed`, req)
 
       results.push(evidence)
-      jobs.push({ evidenceId: evidence._id, jobId: String(job.id) })
     }
 
     await caseDoc.save()
 
     res.status(201).json({
-      message: `${results.length} evidence file(s) uploaded and queued for processing`,
+      message: `${results.length} evidence file(s) uploaded and processed`,
       evidence: results,
       jobs,
     })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// GET /api/evidence?caseId=xxx — List evidence for a case
+router.get('/', optionalAuth, async (req, res, next) => {
+  try {
+    const { caseId, limit = 50 } = req.query
+    if (!caseId) return res.status(400).json({ error: 'caseId query parameter is required' })
+
+    const evidenceList = await Evidence.find({ caseId })
+      .sort('-createdAt')
+      .limit(parseInt(limit))
+      .select('-parsedData.events.raw') // skip heavy raw field for listing
+      .lean()
+
+    res.json({ evidence: evidenceList })
   } catch (err) {
     next(err)
   }
