@@ -255,6 +255,46 @@ router.get('/:id', optionalAuth, async (req, res, next) => {
   }
 })
 
+// DELETE /api/evidence/:id — Remove evidence file and record
+router.delete('/:id', optionalAuth, async (req, res, next) => {
+  try {
+    const reqUser = await getReqUser(req)
+    if (reqUser && reqUser.role === 'viewer') {
+      return res.status(403).json({ error: 'Viewers cannot delete evidence' })
+    }
+
+    const evidence = await Evidence.findById(req.params.id)
+    if (!evidence) return res.status(404).json({ error: 'Evidence not found' })
+
+    const caseDoc = await Case.findById(evidence.caseId)
+    if (caseDoc && reqUser && !canAccessCase(caseDoc, reqUser.id, reqUser.role)) {
+      return res.status(403).json({ error: 'Access denied to this case' })
+    }
+
+    // Remove file from disk
+    if (evidence.filePath) {
+      const fs = await import('fs')
+      try { fs.unlinkSync(evidence.filePath) } catch {}
+    }
+
+    // Remove from case's evidence array
+    if (caseDoc) {
+      caseDoc.evidence = caseDoc.evidence.filter(id => id.toString() !== evidence._id.toString())
+      await caseDoc.save()
+    }
+
+    const name = evidence.originalName || evidence.filename
+    await Evidence.findByIdAndDelete(req.params.id)
+
+    await logAudit('evidence_deleted', 'evidence', req.params.id,
+      `Evidence "${name}" deleted`, req)
+
+    res.json({ message: `Evidence "${name}" deleted successfully` })
+  } catch (err) {
+    next(err)
+  }
+})
+
 router.post('/:id/parse', optionalAuth, async (req, res, next) => {
   try {
     const reqUser = await getReqUser(req)

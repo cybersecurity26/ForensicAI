@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import {
   Upload, FileText, Hash, CheckCircle, AlertTriangle,
   X, File, HardDrive, Shield, Copy, Clock, Loader, RefreshCw,
-  FolderOpen, Plus, ArrowRight
+  FolderOpen, Plus, ArrowRight, Trash2
 } from 'lucide-react'
 import { getCases, uploadEvidence } from '../api'
 
@@ -173,6 +173,26 @@ export default function EvidenceUpload() {
       processFiles([...e.dataTransfer.files])
     }
   }, [])
+
+  const handleDeleteEvidence = async (evidenceId, name) => {
+    if (!confirm(`Delete "${name}"? This action cannot be undone.`)) return
+    try {
+      const token = localStorage.getItem('forensic_token') || ''
+      const res = await fetch(`${BASE}/evidence/${evidenceId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        setUploadedEvidence(prev => prev.filter(e => e._id !== evidenceId))
+        setUploadResult({ success: true, message: `"${name}" deleted successfully` })
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setUploadResult({ success: false, message: data.error || 'Delete failed' })
+      }
+    } catch {
+      setUploadResult({ success: false, message: 'Network error while deleting' })
+    }
+  }
 
   return (
     <motion.div className="page-enter" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -438,13 +458,33 @@ export default function EvidenceUpload() {
                       {ev.createdAt && <span><Clock size={10} style={{ marginRight: 3 }} />{new Date(ev.createdAt).toLocaleDateString()}</span>}
                     </div>
                   </div>
-                  <div style={{
-                    padding: '3px 9px', borderRadius: 'var(--radius-sm)',
-                    background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.18)',
-                    color: 'var(--accent-success)', fontSize: '0.7rem', fontWeight: 600, flexShrink: 0,
-                  }}>
-                    <Shield size={10} style={{ marginRight: 3 }} />
-                    {ev.status === 'parsed' ? 'Parsed' : ev.status === 'uploaded' ? 'Uploaded' : 'Stored'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    <div style={{
+                      padding: '3px 9px', borderRadius: 'var(--radius-sm)',
+                      background: ev.status === 'error' ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)',
+                      border: `1px solid ${ev.status === 'error' ? 'rgba(239,68,68,0.18)' : 'rgba(16,185,129,0.18)'}`,
+                      color: ev.status === 'error' ? '#ef4444' : 'var(--accent-success)',
+                      fontSize: '0.7rem', fontWeight: 600,
+                    }}>
+                      <Shield size={10} style={{ marginRight: 3 }} />
+                      {ev.status === 'parsed' ? 'Parsed' : ev.status === 'error' ? 'Error' : ev.status === 'queued' ? 'Queued' : 'Stored'}
+                    </div>
+                    {!ev._id?.startsWith('optimistic-') && (
+                      <button
+                        onClick={() => handleDeleteEvidence(ev._id, ev.originalName || ev.filename || 'file')}
+                        title="Delete evidence"
+                        style={{
+                          width: 30, height: 30, borderRadius: 'var(--radius-sm)',
+                          border: '1px solid transparent', background: 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: 'pointer', color: 'var(--text-muted)', transition: 'all 0.2s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.2)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'transparent' }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               ))}
