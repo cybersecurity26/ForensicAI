@@ -106,12 +106,14 @@ router.post('/upload', optionalAuth, upload.array('files', 10), async (req, res,
       // Try BullMQ first; fall back to synchronous inline processing
       let queued = false
       try {
-        const job = await enqueueEvidenceProcessing({
+        const jobPromise = enqueueEvidenceProcessing({
           evidenceId: evidence._id,
           caseId: caseDoc._id,
           requestedBy: reqUser?.id,
           reason: 'upload',
         })
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Queue timeout')), 2000))
+        const job = await Promise.race([jobPromise, timeoutPromise])
         evidence.processing.queueJobId = String(job.id)
         evidence.processing.message = 'Queued for background processing'
         await evidence.save()
@@ -313,12 +315,14 @@ router.post('/:id/parse', optionalAuth, async (req, res, next) => {
     // Try BullMQ first, fall back to inline
     let queued = false
     try {
-      const job = await enqueueEvidenceProcessing({
+      const jobPromise = enqueueEvidenceProcessing({
         evidenceId: evidence._id,
         caseId: evidence.caseId,
         requestedBy: reqUser?.id,
         reason: 'manual_parse',
       })
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Queue timeout')), 2000))
+      const job = await Promise.race([jobPromise, timeoutPromise])
       evidence.status = 'queued'
       evidence.processing.queueJobId = String(job.id)
       evidence.processing.progress = 0
