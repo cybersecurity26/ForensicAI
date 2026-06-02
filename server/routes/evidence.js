@@ -270,28 +270,104 @@ router.post('/:id/parse', optionalAuth, async (req, res, next) => {
       return res.status(403).json({ error: 'Access denied to this case' })
     }
 
-    const job = await enqueueEvidenceProcessing({
-      evidenceId: evidence._id,
-      caseId: evidence.caseId,
-      requestedBy: reqUser?.id,
-      reason: 'manual_parse',
-    })
+    // Try BullMQ first, fall back to inline
+    let queued = false
+    try {
+      const job = await enqueueEvidenceProcessing({
+        evidenceId: evidence._id,
+        caseId: evidence.caseId,
+        requestedBy: reqUser?.id,
+        reason: 'manual_parse',
+      })
+      evidence.status = 'queued'
+      evidence.processing.queueJobId = String(job.id)
+      evidence.processing.progress = 0
+      evidence.processing.message = 'Manual parse queued'
+      evidence.processing.lastError = ''
+      await evidence.save()
+      queued = true
 
-    evidence.status = 'queued'
-    evidence.processing.queueJobId = String(job.id)
-    evidence.processing.progress = 0
-    evidence.processing.message = 'Manual parse queued'
-    evidence.processing.lastError = ''
-    await evidence.save()
+      return res.status(202).json({
+        message: 'Evidence processing job queued',
+        evidenceId: evidence._id,
+        jobId: String(job.id),
+      })
+    } catch (queueErr) {
+      console.warn('BullMQ unavailable for re-parse, processing inline:', queueErr.message)
+    }
 
-    await logAudit('evidence_processing_queued', 'evidence', evidence._id,
-      `Manual parse queued as BullMQ job ${job.id}`, req)
+    // Sync fallback
+    if (!queued) {
+      const { computeFileHash } = await import('../utils/hash.js')
+      const { parseLogFile } = await import('../utils/parser.js')
+      const { detectEventAnomalies } = await import('../ml/anomalyDetector.js')
 
-    res.status(202).json({
-      message: 'Evidence processing job queued',
-      evidenceId: evidence._id,
-      jobId: String(job.id),
-    })
+      if (!evidence.sha256Hash && evidence.filePath) {
+        try {
+          evidence.sha256Hash = await computeFileHash(evidence.filePath)
+          evidence.verifiedAt = new Date()
+        } catch {}
+      }
+
+      const ext = path.extname(evidence.originalName || '').toLowerCase()
+      const PARSEABLE = new Set(['.log', '.txt', '.csv', '.json', '.xml', '.evtx', '.pcap', '.reg'])
+
+      if (PARSEABLE.has(ext) && evidence.filePath) {
+        evidence.status = 'parsing'
+        await evidence.save()
+
+        const filePath = evidence.filePath
+        const parsedResult = await parseLogFile(filePath, { originalName: evidence.originalName })
+        const mlResult = await detectEventAnomalies(parsedResult.events)
+
+        evidence.parsedData = {
+          events: mlResult.events.map(e => ({
+            timestamp: e.timestamp || '', eventType: e.eventType || 'system',
+            source: e.source || evidence.originalName, sourceType: e.sourceType || '',
+            host: e.host || '', user: e.user || '', sourceIp: e.sourceIp || '',
+            destinationIp: e.destinationIp || '', process: e.process || '',
+            filePath: e.filePath || '', registryKey: e.registryKey || '',
+            registryValue: e.registryValue || '', detail: e.detail || '',
+            severity: e.severity || 'info', raw: e.raw || '',
+            normalized: e.normalized !== false,
+            parserType: e.parserType || parsedResult.parser,
+            normalizerType: e.normalizerType || parsedResult.normalizer,
+            riskScore: e.riskScore || 0, riskLevel: e.riskLevel || 'low',
+            riskReasons: e.riskReasons || [],
+            mlAnomaly: e.mlAnomaly || { isAnomaly: false, score: 0, confidence: 0, model: 'IsolationForest', reasons: [] },
+            threatIntel: e.threatIntel || { score: 0, isMalicious: false, details: '' },
+            mitreAttack: e.mitreAttack || { techniqueId: '', techniqueName: '', tactic: '' },
+          })),
+          summary: parsedResult.summary,
+          anomalies: mlResult.events
+            .filter(e => e.severity === 'danger' || e.severity === 'critical' || (e.riskScore || 0) >= 61)
+            .map(e => e.detail),
+          mlSummary: { ...mlResult.mlSummary, generatedAt: new Date() },
+          mlAnomalies: mlResult.mlAnomalies,
+        }
+
+        evidence.metadata.lineCount = parsedResult.lineCount
+        evidence.processing.parserType = parsedResult.parser
+        evidence.processing.normalizerType = parsedResult.normalizer
+        evidence.processing.artifactType = parsedResult.artifactType
+        evidence.processing.normalizedAt = new Date()
+        evidence.status = parsedResult.events.length > 0 ? 'parsed' : 'verified'
+      } else {
+        evidence.status = 'verified'
+      }
+
+      evidence.processing.progress = 100
+      evidence.processing.message = 'Re-processing complete'
+      evidence.processing.lastError = ''
+      await evidence.save()
+
+      return res.json({
+        message: 'Evidence re-processed successfully',
+        evidenceId: evidence._id,
+        status: evidence.status,
+        events: evidence.parsedData?.events?.length || 0,
+      })
+    }
   } catch (err) {
     next(err)
   }
