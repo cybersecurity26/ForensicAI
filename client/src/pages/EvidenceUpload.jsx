@@ -20,7 +20,7 @@ const allowedTypes = [
   { ext: '.txt', label: 'Plain Text', icon: '📄' },
 ]
 
-const ALLOWED_EXTENSIONS = ['log', 'csv', 'json', 'pcap', 'img', 'dd', 'evtx', 'xml', 'txt']
+const ALLOWED_EXTENSIONS = ['log', 'csv', 'json', 'pcap', 'img', 'dd', 'evtx', 'xml', 'txt', 'reg', 'raw', 'zip', 'gz']
 
 async function generateHash() {
   const array = new Uint8Array(32)
